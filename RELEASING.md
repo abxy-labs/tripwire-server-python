@@ -6,10 +6,9 @@ This repository uses a manual `release.yml` workflow. Versions are independent f
 
 Configure these GitHub and registry settings:
 
-1. Make the repository public.
-2. Create a protected GitHub environment named `release` with required reviewer approval.
-3. Create the `tripwire-server` project on PyPI if it does not already exist.
-4. Add a pending PyPI trusted publisher for:
+1. Create a protected GitHub environment named `release` with required reviewer approval.
+2. Create the `tripwire-server` project on PyPI if it does not already exist.
+3. Add a pending PyPI trusted publisher for:
    - repository: `abxy-labs/tripwire-server-python`
    - workflow: `.github/workflows/release.yml`
    - environment: `release`
