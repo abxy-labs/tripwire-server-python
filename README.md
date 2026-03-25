@@ -1,62 +1,65 @@
-# `tripwire-server`
+# Tripwire Python Library
 
-Official Tripwire Python server SDK.
+![Preview](https://img.shields.io/badge/status-preview-111827)
+![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-3776AB?logo=python&logoColor=white)
+![License: MIT](https://img.shields.io/badge/license-MIT-0f766e.svg)
 
-`tripwire-server` exposes the customer-facing server APIs for:
+The Tripwire Python library provides convenient access to the Tripwire API from applications written in Python. It includes a synchronous client for Sessions, Fingerprints, Teams, Team API key management, and sealed token verification.
 
-- Sessions API
-- Fingerprints API
-- Teams API
-- Team API key management
-- sealed token verification
+The library also provides:
 
-It does not include collect endpoints or internal scoring APIs.
+- a fast configuration path using `TRIPWIRE_SECRET_KEY`
+- iterator helpers for cursor-based pagination
+- structured API errors and built-in sealed token verification
+
+## Documentation
+
+See the [Tripwire docs](https://tripwire.com/docs) and [API reference](https://tripwire.com/docs/api-reference/introduction).
 
 ## Installation
+
+You don't need this source code unless you want to modify the package. If you just want to use the package, run:
 
 ```bash
 pip install tripwire-server
 ```
 
-## Quick start
+## Requirements
+
+- Python 3.10+
+
+## Usage
+
+The library needs to be configured with your account's secret key. Set `TRIPWIRE_SECRET_KEY` in your environment or pass `secret_key` directly:
 
 ```python
-from tripwire_server import Tripwire, safe_verify_tripwire_token
+from tripwire_server import Tripwire
 
 client = Tripwire(secret_key="sk_live_...")
 
-sessions = client.sessions.list(verdict="bot", limit=25)
+page = client.sessions.list(verdict="bot", limit=25)
 session = client.sessions.get("sid_123")
+```
 
-result = safe_verify_tripwire_token("AQAA...", "sk_live_...")
+### Sealed token verification
+
+```python
+from tripwire_server import safe_verify_tripwire_token
+
+result = safe_verify_tripwire_token(
+    sealed_token,
+    "sk_live_...",
+)
+
 if result.ok:
     print(result.data.verdict, result.data.score)
+else:
+    print(result.error)
 ```
 
-## Constructor
+### Pagination
 
 ```python
-Tripwire(
-    secret_key=None,
-    base_url="https://api.tripwirejs.com",
-    timeout=30.0,
-    user_agent=None,
-)
-```
-
-Defaults:
-
-- `secret_key`: `TRIPWIRE_SECRET_KEY`
-- `base_url`: `https://api.tripwirejs.com`
-- `timeout`: `30.0` seconds
-
-## Examples
-
-### Sessions
-
-```python
-page = client.sessions.list(verdict="human", limit=50)
-
 for session in client.sessions.iter(search="signup"):
     print(session.id, session.latest_result.verdict)
 ```
@@ -87,7 +90,17 @@ created = client.teams.api_keys.create(
 client.teams.api_keys.revoke("team_123", created.id)
 ```
 
-## Development
+### Error handling
 
-The canonical cross-language server SDK spec lives in the Tripwire main repo under `sdk-spec/server/`.
-This repo carries a synced copy in `spec/` for standalone testing and release workflows.
+```python
+from tripwire_server import TripwireApiError
+
+try:
+    client.sessions.list(limit=999)
+except TripwireApiError as error:
+    print(error.status, error.code, error.message)
+```
+
+## Support
+
+If you need help integrating Tripwire, start with [tripwire.com/docs](https://tripwire.com/docs).
