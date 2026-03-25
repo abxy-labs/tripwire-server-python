@@ -22,7 +22,7 @@ def best_effort_revoke(client: Tripwire, team_id: str, key_id: str | None) -> No
     try:
         client.teams.api_keys.revoke(team_id, key_id)
     except TripwireApiError as error:
-        if error.status == 404 or error.code == "resource.not_found":
+        if error.status == 404 or error.code == "request.not_found":
             return
         raise
 

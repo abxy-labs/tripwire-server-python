@@ -78,8 +78,8 @@ class ClientTests(unittest.TestCase):
             "data": [
                 {
                     **first_page["data"][0],
-                    "id": "sid_example_two",
-                    "latestEventId": "evt_example_two",
+                    "id": "sid_123456789abcdefghjkmnpqrst",
+                    "latestEventId": "evt_3456789abcdefghjkmnpqrstvw",
                     "lastScoredAt": "2026-03-24T20:01:05.000Z",
                 }
             ],
@@ -102,7 +102,7 @@ class ClientTests(unittest.TestCase):
             self.assertEqual(page.next_cursor, "cur_sessions_page_2")
             self.assertEqual(
                 [item.id for item in client.sessions.iter(verdict="human")],
-                ["sid_example_one", "sid_example_two"],
+                ["sid_0123456789abcdefghjkmnpqrs", "sid_123456789abcdefghjkmnpqrst"],
             )
         finally:
             client.close()
@@ -114,20 +114,20 @@ class ClientTests(unittest.TestCase):
 
         def handler(request: httpx.Request) -> httpx.Response:
             path = request.url.path
-            if path.endswith("/v1/sessions/sid_example_one"):
+            if path.endswith("/v1/sessions/sid_0123456789abcdefghjkmnpqrs"):
                 return json_response(session_fixture)
-            if path.endswith("/v1/fingerprints/vis_example_one"):
+            if path.endswith("/v1/fingerprints/vid_456789abcdefghjkmnpqrstvwx"):
                 return json_response(fp_detail_fixture)
             return json_response(fp_list_fixture)
 
         client = Tripwire(secret_key="sk_live_test", transport=httpx.MockTransport(handler))
         try:
-            session = client.sessions.get("sid_example_one")
-            self.assertEqual(session.id, "sid_example_one")
+            session = client.sessions.get("sid_0123456789abcdefghjkmnpqrs")
+            self.assertEqual(session.id, "sid_0123456789abcdefghjkmnpqrs")
             fp_page = client.fingerprints.list()
-            self.assertEqual(fp_page.items[0].id, "vis_example_one")
-            fp_detail = client.fingerprints.get("vis_example_one")
-            self.assertEqual(fp_detail.id, "vis_example_one")
+            self.assertEqual(fp_page.items[0].id, "vid_456789abcdefghjkmnpqrstvwx")
+            fp_detail = client.fingerprints.get("vid_456789abcdefghjkmnpqrstvwx")
+            self.assertEqual(fp_detail.id, "vid_456789abcdefghjkmnpqrstvwx")
         finally:
             client.close()
 
@@ -144,39 +144,39 @@ class ClientTests(unittest.TestCase):
             method = request.method
             if path.endswith("/v1/teams") and method == "POST":
                 return json_response(team_create_fixture, status_code=201)
-            if path.endswith("/v1/teams/team_example") and method == "PATCH":
+            if path.endswith("/v1/teams/team_56789abcdefghjkmnpqrstvwxy") and method == "PATCH":
                 return json_response(team_update_fixture)
-            if path.endswith("/v1/teams/team_example") and method == "GET":
+            if path.endswith("/v1/teams/team_56789abcdefghjkmnpqrstvwxy") and method == "GET":
                 return json_response(team_fixture)
-            if path.endswith("/v1/teams/team_example/api-keys/key_example/rotations"):
+            if path.endswith("/v1/teams/team_56789abcdefghjkmnpqrstvwxy/api-keys/key_6789abcdefghjkmnpqrstvwxyz/rotations"):
                 return json_response(key_rotate_fixture, status_code=201)
-            if path.endswith("/v1/teams/team_example/api-keys/key_example"):
+            if path.endswith("/v1/teams/team_56789abcdefghjkmnpqrstvwxy/api-keys/key_6789abcdefghjkmnpqrstvwxyz"):
                 return httpx.Response(status_code=204)
-            if path.endswith("/v1/teams/team_example/api-keys") and method == "POST":
+            if path.endswith("/v1/teams/team_56789abcdefghjkmnpqrstvwxy/api-keys") and method == "POST":
                 return json_response(key_create_fixture, status_code=201)
-            if path.endswith("/v1/teams/team_example/api-keys"):
+            if path.endswith("/v1/teams/team_56789abcdefghjkmnpqrstvwxy/api-keys"):
                 return json_response(key_list_fixture)
             raise AssertionError(f"Unexpected request: {method} {path}")
 
         client = Tripwire(secret_key="sk_live_test", transport=httpx.MockTransport(handler))
         try:
-            self.assertEqual(client.teams.get("team_example").id, "team_example")
+            self.assertEqual(client.teams.get("team_56789abcdefghjkmnpqrstvwxy").id, "team_56789abcdefghjkmnpqrstvwxy")
             self.assertEqual(
                 client.teams.create(name="Example Team", slug="example-team").updated_at,
                 "2026-03-24T19:00:00.000Z",
             )
             self.assertEqual(
-                client.teams.update("team_example", name="Updated Example Team").name,
+                client.teams.update("team_56789abcdefghjkmnpqrstvwxy", name="Updated Example Team").name,
                 "Updated Example Team",
             )
             self.assertEqual(
-                client.teams.api_keys.create("team_example", name="Production").secret_key,
+                client.teams.api_keys.create("team_56789abcdefghjkmnpqrstvwxy", name="Production").secret_key,
                 "sk_live_example",
             )
-            self.assertEqual(client.teams.api_keys.list("team_example").items[0].id, "key_example")
-            client.teams.api_keys.revoke("team_example", "key_example")
+            self.assertEqual(client.teams.api_keys.list("team_56789abcdefghjkmnpqrstvwxy").items[0].id, "key_6789abcdefghjkmnpqrstvwxyz")
+            client.teams.api_keys.revoke("team_56789abcdefghjkmnpqrstvwxy", "key_6789abcdefghjkmnpqrstvwxyz")
             self.assertEqual(
-                client.teams.api_keys.rotate("team_example", "key_example").secret_key,
+                client.teams.api_keys.rotate("team_56789abcdefghjkmnpqrstvwxy", "key_6789abcdefghjkmnpqrstvwxyz").secret_key,
                 "sk_live_rotated",
             )
         finally:
