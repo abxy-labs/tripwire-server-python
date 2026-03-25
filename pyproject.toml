@@ -1,0 +1,26 @@
+[build-system]
+requires = ["hatchling>=1.27.0"]
+build-backend = "hatchling.build"
+
+[project]
+name = "tripwire-server"
+version = "0.1.0"
+description = "Official Tripwire Python server SDK"
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.10"
+authors = [
+  { name = "ABXY Labs" }
+]
+dependencies = [
+  "cryptography>=42,<47",
+  "httpx>=0.27,<1"
+]
+
+[project.urls]
+Homepage = "https://github.com/abxy-labs/tripwire-server-python"
+Repository = "https://github.com/abxy-labs/tripwire-server-python"
+Issues = "https://github.com/abxy-labs/tripwire-server-python/issues"
+
+[tool.hatch.build.targets.wheel]
+packages = ["tripwire_server"]
