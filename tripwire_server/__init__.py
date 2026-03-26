@@ -7,8 +7,6 @@ from .errors import (
 from .sealed_token import safe_verify_tripwire_token, verify_tripwire_token
 from .types import (
     ApiKey,
-    FingerprintDetail,
-    FingerprintSummary,
     IssuedApiKey,
     ListResult,
     SessionDetail,
@@ -16,12 +14,12 @@ from .types import (
     Team,
     VerificationResult,
     VerifiedTripwireToken,
+    VisitorFingerprintDetail,
+    VisitorFingerprintSummary,
 )
 
 __all__ = [
     "ApiKey",
-    "FingerprintDetail",
-    "FingerprintSummary",
     "IssuedApiKey",
     "ListResult",
     "SessionDetail",
@@ -33,6 +31,8 @@ __all__ = [
     "TripwireTokenVerificationError",
     "VerificationResult",
     "VerifiedTripwireToken",
+    "VisitorFingerprintDetail",
+    "VisitorFingerprintSummary",
     "verify_tripwire_token",
     "safe_verify_tripwire_token",
 ]

@@ -77,7 +77,7 @@ class LiveSmokeTests(unittest.TestCase):
             created_key = client.teams.api_keys.create(
                 team_id,
                 name=f"sdk-smoke-{int(time.time() * 1000):x}",
-                is_test=True,
+                environment="test",
             )
             created_key_id = created_key.id
             self.assertTrue(created_key.secret_key.startswith("sk_"))
@@ -95,7 +95,8 @@ class LiveSmokeTests(unittest.TestCase):
             verified = safe_verify_tripwire_token(fixture["token"], fixture["secretKey"])
             self.assertTrue(verified.ok)
             if verified.ok and verified.data is not None:
-                self.assertEqual(verified.data.event_id, fixture["payload"]["eventId"])
+                self.assertEqual(verified.data.session_id, fixture["payload"]["session_id"])
+                self.assertEqual(verified.data.decision.event_id, fixture["payload"]["decision"]["event_id"])
         finally:
             best_effort_revoke(client, team_id, rotated_key_id)
             if created_key_id != rotated_key_id:

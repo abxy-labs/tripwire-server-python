@@ -35,17 +35,17 @@ class ContractTests(unittest.TestCase):
 
     def test_expected_success_fixtures_exist(self) -> None:
         fixtures = [
-            "public-api/sessions/list.json",
-            "public-api/sessions/detail.json",
-            "public-api/fingerprints/list.json",
-            "public-api/fingerprints/detail.json",
-            "public-api/teams/team.json",
-            "public-api/teams/team-create.json",
-            "public-api/teams/team-update.json",
-            "public-api/teams/api-key-create.json",
-            "public-api/teams/api-key-list.json",
-            "public-api/teams/api-key-rotate.json",
-            "public-api/teams/api-key-revoke.json",
+            "api/sessions/list.json",
+            "api/sessions/detail.json",
+            "api/fingerprints/list.json",
+            "api/fingerprints/detail.json",
+            "api/teams/team.json",
+            "api/teams/team-create.json",
+            "api/teams/team-update.json",
+            "api/teams/api-key-create.json",
+            "api/teams/api-key-list.json",
+            "api/teams/api-key-rotate.json",
+            "api/teams/api-key-revoke.json",
         ]
         for relative_path in fixtures:
             with self.subTest(relative_path=relative_path):
@@ -68,9 +68,30 @@ class ContractTests(unittest.TestCase):
         )
         self.assertEqual(schemas["TeamStatus"]["enum"], ["active", "suspended", "deleted"])
         self.assertEqual(schemas["ApiKeyStatus"]["enum"], ["active", "revoked", "rotated"])
-        self.assertIn("ipIntel", schemas["SessionDetail"]["required"])
         self.assertTrue(
-            {"allowedOrigins", "rateLimit", "rotatedAt", "revokedAt"}.issubset(set(schemas["ApiKey"]["required"]))
+            {"decision", "highlights", "automation", "web_bot_auth", "network", "runtime_integrity", "visitor_fingerprint", "connection_fingerprint", "previous_decisions", "request", "browser", "device", "analysis_coverage", "signals_fired", "client_telemetry"}.issubset(
+                set(schemas["SessionDetail"]["required"])
+            )
+        )
+        self.assertEqual(
+            schemas["SessionDetail"]["properties"]["request"],
+            {"$ref": "#/components/schemas/SessionDetailRequest"},
+        )
+        self.assertEqual(
+            schemas["SessionDetail"]["properties"]["client_telemetry"],
+            {"$ref": "#/components/schemas/SessionClientTelemetry"},
+        )
+        self.assertEqual(
+            schemas["SessionDetail"]["properties"]["automation"],
+            {"anyOf": [{"$ref": "#/components/schemas/SessionAutomation"}, {"type": "null"}]},
+        )
+        self.assertEqual(
+            schemas["SessionDetail"]["properties"]["signals_fired"],
+            {"type": "array", "items": {"$ref": "#/components/schemas/SessionSignalFired"}},
+        )
+        self.assertEqual(schemas["SessionSignalFired"]["properties"]["signal"]["type"], "string")
+        self.assertTrue(
+            {"allowed_origins", "rate_limit", "rotated_at", "revoked_at"}.issubset(set(schemas["ApiKey"]["required"]))
         )
         self.assertNotIn("CollectBatchResponse", schemas)
 
@@ -79,8 +100,8 @@ class ContractTests(unittest.TestCase):
 
         self.assertEqual(paths["/v1/sessions"]["get"]["operationId"], "listSessions")
         self.assertEqual(paths["/v1/sessions"]["get"]["tags"], ["Sessions"])
-        self.assertEqual(paths["/v1/fingerprints/{visitorId}"]["get"]["operationId"], "getFingerprint")
-        self.assertEqual(paths["/v1/fingerprints/{visitorId}"]["get"]["tags"], ["Fingerprints"])
+        self.assertEqual(paths["/v1/fingerprints/{visitorId}"]["get"]["operationId"], "getVisitorFingerprint")
+        self.assertEqual(paths["/v1/fingerprints/{visitorId}"]["get"]["tags"], ["Visitor fingerprints"])
         self.assertEqual(paths["/v1/teams/{teamId}"]["patch"]["operationId"], "updateTeam")
         self.assertEqual(paths["/v1/teams/{teamId}"]["patch"]["tags"], ["Teams"])
         self.assertEqual(
