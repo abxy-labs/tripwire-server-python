@@ -15,39 +15,55 @@ class ListResult(Generic[T]):
 
 
 @dataclass(frozen=True)
-class ResultSummary:
+class DecisionManipulation:
+    score: int | None
+    verdict: str | None
+
+
+@dataclass(frozen=True)
+class Decision:
     event_id: str
     verdict: str
     risk_score: int
     phase: str | None
-    provisional: bool | None
-    manipulation_score: int | None
-    manipulation_verdict: str | None
-    evaluation_duration: int | None
-    scored_at: str
+    is_provisional: bool | None
+    manipulation: DecisionManipulation | None
+    evaluation_duration_ms: int | None
+    evaluated_at: str
 
 
 @dataclass(frozen=True)
-class FingerprintReference:
+class VisitorFingerprintLink:
     object: str
     id: str
     confidence: int | None
-    timestamp: str | None
+    identified_at: str | None
 
 
 @dataclass(frozen=True)
-class SessionMetadata:
+class RequestContext:
     user_agent: str
     url: str
     screen_size: str | None
-    touch_device: bool | None
-    client_ip: str
+    is_touch_capable: bool | None
+    ip_address: str
 
 
 @dataclass(frozen=True)
-class SessionLatestResultDetail(ResultSummary):
-    visitor_id: str | None
-    metadata: SessionMetadata
+class SessionDetailRequest:
+    url: str
+    referrer: str | None
+    user_agent: str
+
+
+@dataclass(frozen=True)
+class SessionDecision:
+    event_id: str
+    automation_status: str
+    risk_score: int
+    evaluation_phase: str | None
+    decision_status: str
+    evaluated_at: str
 
 
 @dataclass(frozen=True)
@@ -55,10 +71,8 @@ class SessionSummary:
     object: str
     id: str
     created_at: str | None
-    latest_event_id: str
-    latest_result: ResultSummary
-    fingerprint: FingerprintReference | None
-    last_scored_at: str
+    latest_decision: Decision
+    visitor_fingerprint: VisitorFingerprintLink | None
 
 
 @dataclass(frozen=True)
@@ -66,50 +80,90 @@ class SessionDetail:
     object: str
     id: str
     created_at: str | None
-    latest_event_id: str
-    latest_result: SessionLatestResultDetail
-    ip_intel: dict[str, Any] | None
-    fingerprint: FingerprintReference | None
-    result_history: list[ResultSummary]
+    decision: SessionDecision
+    highlights: list[dict[str, Any]]
+    automation: dict[str, Any] | None
+    web_bot_auth: dict[str, Any] | None
+    network: dict[str, Any]
+    runtime_integrity: dict[str, Any]
+    visitor_fingerprint: dict[str, Any] | None
+    connection_fingerprint: dict[str, Any]
+    previous_decisions: list[SessionDecision]
+    request: SessionDetailRequest
+    browser: dict[str, Any]
+    device: dict[str, Any]
+    analysis_coverage: dict[str, bool]
+    signals_fired: list[dict[str, Any]]
+    client_telemetry: dict[str, Any]
 
 
 @dataclass(frozen=True)
-class FingerprintSummary:
-    object: str
-    id: str
+class VisitorFingerprintLifecycle:
     first_seen_at: str
     last_seen_at: str
     seen_count: int
-    last_user_agent: str
-    last_ip: str
     expires_at: str
-    anchor_webgl_hash: str | None
-    anchor_params_hash: str | None
-    anchor_audio_hash: str | None
-    fingerprint_vector: list[int]
-    has_cookie: bool
-    has_ls: bool
-    has_idb: bool
-    has_sw: bool
-    has_wn: bool
 
 
 @dataclass(frozen=True)
-class FingerprintSessionSummary:
-    event_id: str
-    verdict: str
-    risk_score: int
-    scored_at: str
+class VisitorFingerprintLatestRequest:
     user_agent: str
-    url: str
-    client_ip: str
-    screen_size: str | None
-    category_scores: dict[str, int] | None
+    ip_address: str
 
 
 @dataclass(frozen=True)
-class FingerprintDetail(FingerprintSummary):
-    sessions: list[FingerprintSessionSummary]
+class VisitorFingerprintStorage:
+    cookies: bool
+    local_storage: bool
+    indexed_db: bool
+    service_worker: bool
+    window_name: bool
+
+
+@dataclass(frozen=True)
+class VisitorFingerprintAnchors:
+    webgl_hash: str | None
+    parameters_hash: str | None
+    audio_hash: str | None
+
+
+@dataclass(frozen=True)
+class VisitorFingerprintSummary:
+    object: str
+    id: str
+    lifecycle: VisitorFingerprintLifecycle
+    latest_request: VisitorFingerprintLatestRequest
+    storage: VisitorFingerprintStorage
+    anchors: VisitorFingerprintAnchors
+
+
+@dataclass(frozen=True)
+class ScoreBreakdown:
+    categories: dict[str, int]
+
+
+@dataclass(frozen=True)
+class VisitorFingerprintSessionSummary:
+    session_id: str
+    decision: Decision
+    request: RequestContext
+    score_breakdown: ScoreBreakdown
+
+
+@dataclass(frozen=True)
+class VisitorFingerprintComponents:
+    vector: list[int]
+
+
+@dataclass(frozen=True)
+class VisitorFingerprintActivity:
+    sessions: list[VisitorFingerprintSessionSummary]
+
+
+@dataclass(frozen=True)
+class VisitorFingerprintDetail(VisitorFingerprintSummary):
+    components: VisitorFingerprintComponents
+    activity: VisitorFingerprintActivity
 
 
 @dataclass(frozen=True)
@@ -127,9 +181,9 @@ class Team:
 class ApiKey:
     object: str
     id: str
-    key: str
+    public_key: str
     name: str
-    is_test: bool
+    environment: str
     allowed_origins: list[str] | None
     rate_limit: int | None
     status: str
@@ -153,24 +207,22 @@ class VerifiedTripwireSignal:
 
 
 @dataclass(frozen=True)
+class Attribution:
+    bot: dict[str, Any] | None
+    raw: dict[str, Any]
+
+
+@dataclass(frozen=True)
 class VerifiedTripwireToken:
-    event_id: str
+    object: str
     session_id: str
-    verdict: str
-    score: int
-    manipulation_score: int | None
-    manipulation_verdict: str | None
-    evaluation_duration: int | None
-    scored_at: int
-    metadata: SessionMetadata
+    decision: Decision
+    request: RequestContext
+    visitor_fingerprint: VisitorFingerprintLink | None
     signals: list[VerifiedTripwireSignal]
-    category_scores: dict[str, int]
-    bot_attribution: dict[str, Any] | None
-    visitor_id: str | None
-    visitor_id_confidence: int | None
-    embed_context: dict[str, Any] | None
-    phase: str | None
-    provisional: bool | None
+    score_breakdown: ScoreBreakdown
+    attribution: Attribution
+    embed: dict[str, Any] | None
     raw: dict[str, Any]
 
 

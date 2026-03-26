@@ -8,8 +8,9 @@ import zlib
 
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 
+from .client import _parse_decision, _parse_request_context, _parse_score_breakdown, _parse_visitor_fingerprint_link
 from .errors import TripwireConfigurationError, TripwireTokenVerificationError
-from .types import SessionMetadata, VerificationResult, VerifiedTripwireSignal, VerifiedTripwireToken
+from .types import Attribution, VerificationResult, VerifiedTripwireSignal, VerifiedTripwireToken
 
 VERSION = 0x01
 
@@ -35,17 +36,10 @@ def _derive_key(secret_key_or_hash: str) -> bytes:
 
 
 def _build_verified_token(payload: dict[str, object]) -> VerifiedTripwireToken:
-    metadata_raw = payload.get("metadata")
-    if not isinstance(metadata_raw, dict):
-        raise TripwireTokenVerificationError("Tripwire token metadata payload is invalid.")
-
-    metadata = SessionMetadata(
-        user_agent=str(metadata_raw.get("userAgent", "")),
-        url=str(metadata_raw.get("url", "")),
-        screen_size=metadata_raw.get("screenSize") if isinstance(metadata_raw.get("screenSize"), str) or metadata_raw.get("screenSize") is None else None,
-        touch_device=metadata_raw.get("touchDevice") if isinstance(metadata_raw.get("touchDevice"), bool) or metadata_raw.get("touchDevice") is None else None,
-        client_ip=str(metadata_raw.get("clientIp", "")),
-    )
+    request_raw = payload.get("request")
+    decision_raw = payload.get("decision")
+    if not isinstance(request_raw, dict) or not isinstance(decision_raw, dict):
+        raise TripwireTokenVerificationError("Tripwire token payload is invalid.")
 
     signals: list[VerifiedTripwireSignal] = []
     for signal_raw in payload.get("signals", []):
@@ -61,31 +55,28 @@ def _build_verified_token(payload: dict[str, object]) -> VerifiedTripwireToken:
             )
         )
 
-    category_scores_raw = payload.get("categoryScores", {})
-    category_scores = (
-        {str(key): int(value) for key, value in dict(category_scores_raw).items()}
-        if isinstance(category_scores_raw, dict)
-        else {}
-    )
+    attribution_raw = payload.get("attribution")
+    attribution_dict = dict(attribution_raw) if isinstance(attribution_raw, dict) else {}
+    bot_attribution = attribution_dict.get("bot")
+
+    score_breakdown_raw = payload.get("score_breakdown")
+    score_breakdown = _parse_score_breakdown(dict(score_breakdown_raw)) if isinstance(score_breakdown_raw, dict) else _parse_score_breakdown({})
 
     return VerifiedTripwireToken(
-        event_id=str(payload.get("eventId", "")),
-        session_id=str(payload.get("sessionId", "")),
-        verdict=str(payload.get("verdict", "")),
-        score=int(payload.get("score", 0)),
-        manipulation_score=int(payload["manipulationScore"]) if isinstance(payload.get("manipulationScore"), int) else None,
-        manipulation_verdict=payload.get("manipulationVerdict") if isinstance(payload.get("manipulationVerdict"), str) or payload.get("manipulationVerdict") is None else None,
-        evaluation_duration=int(payload["evaluationDuration"]) if isinstance(payload.get("evaluationDuration"), int) else None,
-        scored_at=int(payload.get("scoredAt", 0)),
-        metadata=metadata,
+        object=str(payload.get("object", "")),
+        session_id=str(payload.get("session_id", "")),
+        decision=_parse_decision(dict(decision_raw)),
+        request=_parse_request_context(dict(request_raw)),
+        visitor_fingerprint=_parse_visitor_fingerprint_link(
+            dict(payload["visitor_fingerprint"]) if isinstance(payload.get("visitor_fingerprint"), dict) else None
+        ),
         signals=signals,
-        category_scores=category_scores,
-        bot_attribution=dict(payload["botAttribution"]) if isinstance(payload.get("botAttribution"), dict) else None,
-        visitor_id=payload.get("visitorId") if isinstance(payload.get("visitorId"), str) or payload.get("visitorId") is None else None,
-        visitor_id_confidence=int(payload["visitorIdConfidence"]) if isinstance(payload.get("visitorIdConfidence"), int) else None,
-        embed_context=dict(payload["embedContext"]) if isinstance(payload.get("embedContext"), dict) else None,
-        phase=payload.get("phase") if isinstance(payload.get("phase"), str) or payload.get("phase") is None else None,
-        provisional=payload.get("provisional") if isinstance(payload.get("provisional"), bool) or payload.get("provisional") is None else None,
+        score_breakdown=score_breakdown,
+        attribution=Attribution(
+            bot=dict(bot_attribution) if isinstance(bot_attribution, dict) else None,
+            raw=attribution_dict,
+        ),
+        embed=dict(payload["embed"]) if isinstance(payload.get("embed"), dict) else None,
         raw=dict(payload),
     )
 

@@ -26,7 +26,7 @@ class ClientTests(unittest.TestCase):
     def test_env_secret_fallback(self) -> None:
         original = os.environ.get("TRIPWIRE_SECRET_KEY")
         os.environ["TRIPWIRE_SECRET_KEY"] = "sk_env_default"
-        fixture = load_fixture("public-api/sessions/list.json")
+        fixture = load_fixture("api/sessions/list.json")
 
         transport = httpx.MockTransport(lambda _request: json_response(fixture))
         try:
@@ -50,7 +50,7 @@ class ClientTests(unittest.TestCase):
                 os.environ["TRIPWIRE_SECRET_KEY"] = original
 
     def test_base_url_timeout_and_headers_are_applied(self) -> None:
-        fixture = load_fixture("public-api/sessions/list.json")
+        fixture = load_fixture("api/sessions/list.json")
 
         def handler(request: httpx.Request) -> httpx.Response:
             self.assertEqual(str(request.url), "https://example.tripwire.dev/v1/sessions?limit=5")
@@ -73,19 +73,25 @@ class ClientTests(unittest.TestCase):
             client.close()
 
     def test_sessions_list_and_iter(self) -> None:
-        first_page = load_fixture("public-api/sessions/list.json")
+        first_page = load_fixture("api/sessions/list.json")
         second_page = {
             "data": [
                 {
                     **first_page["data"][0],
                     "id": "sid_123456789abcdefghjkmnpqrst",
-                    "latestEventId": "evt_3456789abcdefghjkmnpqrstvw",
-                    "lastScoredAt": "2026-03-24T20:01:05.000Z",
+                    "latest_decision": {
+                        **first_page["data"][0]["latest_decision"],
+                        "event_id": "evt_3456789abcdefghjkmnpqrstvw",
+                        "evaluated_at": "2026-03-24T20:01:05.000Z",
+                    },
                 }
             ],
             "pagination": {
                 "limit": 50,
-                "hasMore": False,
+                "has_more": False,
+            },
+            "meta": {
+                "request_id": "req_0123456789abcdef0123456789abcdef",
             },
         }
 
@@ -108,9 +114,9 @@ class ClientTests(unittest.TestCase):
             client.close()
 
     def test_session_detail_and_fingerprint_endpoints(self) -> None:
-        session_fixture = load_fixture("public-api/sessions/detail.json")
-        fp_list_fixture = load_fixture("public-api/fingerprints/list.json")
-        fp_detail_fixture = load_fixture("public-api/fingerprints/detail.json")
+        session_fixture = load_fixture("api/sessions/detail.json")
+        fp_list_fixture = load_fixture("api/fingerprints/list.json")
+        fp_detail_fixture = load_fixture("api/fingerprints/detail.json")
 
         def handler(request: httpx.Request) -> httpx.Response:
             path = request.url.path
@@ -132,12 +138,12 @@ class ClientTests(unittest.TestCase):
             client.close()
 
     def test_teams_and_api_keys(self) -> None:
-        team_fixture = load_fixture("public-api/teams/team.json")
-        team_create_fixture = load_fixture("public-api/teams/team-create.json")
-        team_update_fixture = load_fixture("public-api/teams/team-update.json")
-        key_create_fixture = load_fixture("public-api/teams/api-key-create.json")
-        key_list_fixture = load_fixture("public-api/teams/api-key-list.json")
-        key_rotate_fixture = load_fixture("public-api/teams/api-key-rotate.json")
+        team_fixture = load_fixture("api/teams/team.json")
+        team_create_fixture = load_fixture("api/teams/team-create.json")
+        team_update_fixture = load_fixture("api/teams/team-update.json")
+        key_create_fixture = load_fixture("api/teams/api-key-create.json")
+        key_list_fixture = load_fixture("api/teams/api-key-list.json")
+        key_rotate_fixture = load_fixture("api/teams/api-key-rotate.json")
 
         def handler(request: httpx.Request) -> httpx.Response:
             path = request.url.path
@@ -151,7 +157,7 @@ class ClientTests(unittest.TestCase):
             if path.endswith("/v1/teams/team_56789abcdefghjkmnpqrstvwxy/api-keys/key_6789abcdefghjkmnpqrstvwxyz/rotations"):
                 return json_response(key_rotate_fixture, status_code=201)
             if path.endswith("/v1/teams/team_56789abcdefghjkmnpqrstvwxy/api-keys/key_6789abcdefghjkmnpqrstvwxyz"):
-                return httpx.Response(status_code=204)
+                return json_response(load_fixture("api/teams/api-key-revoke.json"))
             if path.endswith("/v1/teams/team_56789abcdefghjkmnpqrstvwxy/api-keys") and method == "POST":
                 return json_response(key_create_fixture, status_code=201)
             if path.endswith("/v1/teams/team_56789abcdefghjkmnpqrstvwxy/api-keys"):
@@ -163,18 +169,21 @@ class ClientTests(unittest.TestCase):
             self.assertEqual(client.teams.get("team_56789abcdefghjkmnpqrstvwxy").id, "team_56789abcdefghjkmnpqrstvwxy")
             self.assertEqual(
                 client.teams.create(name="Example Team", slug="example-team").updated_at,
-                "2026-03-24T19:00:00.000Z",
+                "2026-03-24T19:10:00.000Z",
             )
             self.assertEqual(
                 client.teams.update("team_56789abcdefghjkmnpqrstvwxy", name="Updated Example Team").name,
-                "Updated Example Team",
+                "Example Team",
             )
             self.assertEqual(
                 client.teams.api_keys.create("team_56789abcdefghjkmnpqrstvwxy", name="Production").secret_key,
                 "sk_live_example",
             )
             self.assertEqual(client.teams.api_keys.list("team_56789abcdefghjkmnpqrstvwxy").items[0].id, "key_6789abcdefghjkmnpqrstvwxyz")
-            client.teams.api_keys.revoke("team_56789abcdefghjkmnpqrstvwxy", "key_6789abcdefghjkmnpqrstvwxyz")
+            self.assertEqual(
+                client.teams.api_keys.revoke("team_56789abcdefghjkmnpqrstvwxy", "key_6789abcdefghjkmnpqrstvwxyz").id,
+                "key_6789abcdefghjkmnpqrstvwxyz",
+            )
             self.assertEqual(
                 client.teams.api_keys.rotate("team_56789abcdefghjkmnpqrstvwxy", "key_6789abcdefghjkmnpqrstvwxyz").secret_key,
                 "sk_live_rotated",
@@ -205,7 +214,7 @@ class ClientTests(unittest.TestCase):
                 lambda _request: json_response(
                     fixture,
                     status_code=int(error["status"]),
-                    headers={"x-request-id": str(error["requestId"])},
+                    headers={"x-request-id": str(error["request_id"])},
                 )
             ),
         )
@@ -213,8 +222,8 @@ class ClientTests(unittest.TestCase):
             with self.assertRaises(TripwireApiError) as exc:
                 client.sessions.list(limit=999)
             self.assertEqual(exc.exception.code, error["code"])
-            self.assertEqual(exc.exception.request_id, error["requestId"])
-            self.assertEqual(exc.exception.docs_url, error["docsUrl"])
+            self.assertEqual(exc.exception.request_id, error["request_id"])
+            self.assertEqual(exc.exception.docs_url, error.get("docs_url"))
             self.assertEqual(bool(exc.exception.field_errors), expected_field_errors)
         finally:
             client.close()
