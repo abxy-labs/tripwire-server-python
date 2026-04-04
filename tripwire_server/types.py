@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Any, Generic, TypeVar
+from cryptography.hazmat.primitives.asymmetric.x25519 import X25519PrivateKey
 
 T = TypeVar("T")
 
@@ -286,6 +287,42 @@ class GateDeliveryEnvelope:
 class GateDeliveryBundle:
     integrator: GateDeliveryEnvelope
     gate: GateDeliveryEnvelope
+
+
+@dataclass(frozen=True)
+class GateDeliveryPayload:
+    version: int
+    outputs: dict[str, str]
+    ack_token: str | None = None
+
+
+@dataclass(frozen=True)
+class GeneratedDeliveryKeyPair:
+    delivery: GateDeliveryRequest
+    private_key: X25519PrivateKey
+
+
+@dataclass(frozen=True)
+class GateEncryptedDeliveryResponse:
+    encrypted_delivery: GateDeliveryEnvelope
+
+
+@dataclass(frozen=True)
+class GateApprovedWebhookTripwire:
+    verdict: str
+    score: float | None
+
+
+@dataclass(frozen=True)
+class GateApprovedWebhookPayload:
+    event: str
+    service_id: str
+    gate_session_id: str
+    gate_account_id: str
+    account_name: str
+    metadata: dict[str, Any] | None
+    tripwire: GateApprovedWebhookTripwire
+    delivery: GateDeliveryRequest
 
 
 @dataclass(frozen=True)
