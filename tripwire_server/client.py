@@ -8,9 +8,23 @@ import httpx
 from .errors import TripwireApiError, TripwireConfigurationError
 from .types import (
     ApiKey,
+    AgentTokenVerification,
     Attribution,
     Decision,
     DecisionManipulation,
+    GateDashboardLogin,
+    GateDeliveryBundle,
+    GateDeliveryEnvelope,
+    GateLoginSession,
+    GateManagedService,
+    GateRegistryEntry,
+    GateServiceBranding,
+    GateServiceConsent,
+    GateServiceEnvVar,
+    GateServiceSdkInstall,
+    GateSessionCreate,
+    GateSessionDeliveryAcknowledgement,
+    GateSessionPollData,
     IssuedApiKey,
     ListResult,
     RequestContext,
@@ -277,6 +291,153 @@ def _parse_issued_api_key(data: dict[str, Any]) -> IssuedApiKey:
     return IssuedApiKey(**api_key.__dict__, secret_key=str(data["secret_key"]))
 
 
+def _parse_gate_service_env_var(data: dict[str, Any]) -> GateServiceEnvVar:
+    return GateServiceEnvVar(
+        name=str(data["name"]),
+        key=str(data["key"]),
+        secret=bool(data["secret"]),
+    )
+
+
+def _parse_gate_service_sdk_install(data: dict[str, Any]) -> GateServiceSdkInstall:
+    return GateServiceSdkInstall(
+        label=str(data["label"]),
+        install=str(data["install"]),
+        url=str(data["url"]),
+    )
+
+
+def _parse_gate_service_branding(data: dict[str, Any] | None) -> GateServiceBranding:
+    payload = data or {}
+    return GateServiceBranding(
+        verified=bool(payload.get("verified", False)),
+        logo_url=payload.get("logo_url") if isinstance(payload.get("logo_url"), str) else None,
+        primary_color=payload.get("primary_color") if isinstance(payload.get("primary_color"), str) else None,
+        secondary_color=payload.get("secondary_color") if isinstance(payload.get("secondary_color"), str) else None,
+        ascii_art=payload.get("ascii_art") if isinstance(payload.get("ascii_art"), str) else None,
+    )
+
+
+def _parse_gate_service_consent(data: dict[str, Any] | None) -> GateServiceConsent:
+    payload = data or {}
+    return GateServiceConsent(
+        terms_url=payload.get("terms_url") if isinstance(payload.get("terms_url"), str) else None,
+        privacy_url=payload.get("privacy_url") if isinstance(payload.get("privacy_url"), str) else None,
+    )
+
+
+def _parse_gate_registry_entry(data: dict[str, Any]) -> GateRegistryEntry:
+    return GateRegistryEntry(
+        id=str(data["id"]),
+        status=str(data["status"]),
+        discoverable=bool(data["discoverable"]),
+        name=str(data["name"]),
+        description=str(data["description"]),
+        website=str(data["website"]),
+        env_vars=[_parse_gate_service_env_var(dict(item)) for item in data.get("env_vars", [])],
+        docs_url=str(data["docs_url"]),
+        sdks=[_parse_gate_service_sdk_install(dict(item)) for item in data.get("sdks", [])],
+        branding=_parse_gate_service_branding(dict(data["branding"])) if isinstance(data.get("branding"), dict) else _parse_gate_service_branding(None),
+        consent=_parse_gate_service_consent(dict(data["consent"])) if isinstance(data.get("consent"), dict) else _parse_gate_service_consent(None),
+        dashboard_login_url=data.get("dashboard_login_url")
+        if isinstance(data.get("dashboard_login_url"), str) or data.get("dashboard_login_url") is None
+        else None,
+    )
+
+
+def _parse_gate_managed_service(data: dict[str, Any]) -> GateManagedService:
+    entry = _parse_gate_registry_entry(data)
+    return GateManagedService(
+        **entry.__dict__,
+        object=str(data["object"]),
+        webhook_url=str(data["webhook_url"]),
+        created_at=str(data["created_at"]),
+        updated_at=str(data["updated_at"]),
+    )
+
+
+def _parse_gate_delivery_envelope(data: dict[str, Any]) -> GateDeliveryEnvelope:
+    return GateDeliveryEnvelope(
+        version=int(data["version"]),
+        algorithm=str(data["algorithm"]),
+        key_id=str(data["key_id"]),
+        ephemeral_public_key=str(data["ephemeral_public_key"]),
+        salt=str(data["salt"]),
+        iv=str(data["iv"]),
+        ciphertext=str(data["ciphertext"]),
+        tag=str(data["tag"]),
+    )
+
+
+def _parse_gate_delivery_bundle(data: dict[str, Any] | None) -> GateDeliveryBundle | None:
+    if data is None:
+        return None
+    return GateDeliveryBundle(
+        integrator=_parse_gate_delivery_envelope(dict(data["integrator"])),
+        gate=_parse_gate_delivery_envelope(dict(data["gate"])),
+    )
+
+
+def _parse_gate_session_create(data: dict[str, Any]) -> GateSessionCreate:
+    return GateSessionCreate(
+        object=str(data["object"]),
+        id=str(data["id"]),
+        status=str(data["status"]),
+        poll_token=str(data["poll_token"]),
+        consent_url=str(data["consent_url"]),
+        expires_at=str(data["expires_at"]),
+    )
+
+
+def _parse_gate_session_poll(data: dict[str, Any]) -> GateSessionPollData:
+    return GateSessionPollData(
+        object=str(data["object"]),
+        id=str(data["id"]),
+        status=str(data["status"]),
+        expires_at=data.get("expires_at") if isinstance(data.get("expires_at"), str) or data.get("expires_at") is None else None,
+        gate_account_id=data.get("gate_account_id") if isinstance(data.get("gate_account_id"), str) or data.get("gate_account_id") is None else None,
+        account_name=data.get("account_name") if isinstance(data.get("account_name"), str) or data.get("account_name") is None else None,
+        delivery_bundle=_parse_gate_delivery_bundle(dict(data["delivery_bundle"])) if isinstance(data.get("delivery_bundle"), dict) else None,
+        docs_url=data.get("docs_url") if isinstance(data.get("docs_url"), str) or data.get("docs_url") is None else None,
+    )
+
+
+def _parse_gate_session_delivery_acknowledgement(data: dict[str, Any]) -> GateSessionDeliveryAcknowledgement:
+    return GateSessionDeliveryAcknowledgement(
+        object=str(data["object"]),
+        gate_session_id=str(data["gate_session_id"]),
+        status=str(data["status"]),
+    )
+
+
+def _parse_gate_login_session(data: dict[str, Any]) -> GateLoginSession:
+    return GateLoginSession(
+        object=str(data["object"]),
+        id=str(data["id"]),
+        status=str(data["status"]),
+        consent_url=str(data["consent_url"]),
+        expires_at=str(data["expires_at"]),
+    )
+
+
+def _parse_gate_dashboard_login(data: dict[str, Any]) -> GateDashboardLogin:
+    return GateDashboardLogin(
+        object=str(data["object"]),
+        gate_account_id=str(data["gate_account_id"]),
+        account_name=str(data["account_name"]),
+    )
+
+
+def _parse_agent_token_verification(data: dict[str, Any]) -> AgentTokenVerification:
+    return AgentTokenVerification(
+        valid=bool(data["valid"]),
+        gate_account_id=data.get("gate_account_id") if isinstance(data.get("gate_account_id"), str) or data.get("gate_account_id") is None else None,
+        status=data.get("status") if isinstance(data.get("status"), str) or data.get("status") is None else None,
+        created_at=data.get("created_at") if isinstance(data.get("created_at"), str) or data.get("created_at") is None else None,
+        expires_at=data.get("expires_at") if isinstance(data.get("expires_at"), str) or data.get("expires_at") is None else None,
+    )
+
+
 def _normalize_list(items: list[Any], pagination: dict[str, Any]) -> ListResult[Any]:
     return ListResult(
         items=items,
@@ -473,6 +634,125 @@ class TeamsAPI(_BaseAPI):
         return _parse_team(dict(response["data"]))
 
 
+class GateRegistryAPI(_BaseAPI):
+    def list(self) -> list[GateRegistryEntry]:
+        response = self._client._request_json("GET", "/v1/gate/registry", auth_mode="none")
+        return [_parse_gate_registry_entry(dict(item)) for item in response["data"]]
+
+    def get(self, service_id: str) -> GateRegistryEntry:
+        response = self._client._request_json("GET", f"/v1/gate/registry/{service_id}", auth_mode="none")
+        return _parse_gate_registry_entry(dict(response["data"]))
+
+
+class GateServicesAPI(_BaseAPI):
+    def list(self) -> list[GateManagedService]:
+        response = self._client._request_json("GET", "/v1/gate/services")
+        return [_parse_gate_managed_service(dict(item)) for item in response["data"]]
+
+    def get(self, service_id: str) -> GateManagedService:
+        response = self._client._request_json("GET", f"/v1/gate/services/{service_id}")
+        return _parse_gate_managed_service(dict(response["data"]))
+
+    def create(self, **body: Any) -> GateManagedService:
+        response = self._client._request_json("POST", "/v1/gate/services", body=body)
+        return _parse_gate_managed_service(dict(response["data"]))
+
+    def update(self, service_id: str, **body: Any) -> GateManagedService:
+        response = self._client._request_json("PATCH", f"/v1/gate/services/{service_id}", body=body)
+        return _parse_gate_managed_service(dict(response["data"]))
+
+    def disable(self, service_id: str) -> GateManagedService:
+        response = self._client._request_json("DELETE", f"/v1/gate/services/{service_id}")
+        return _parse_gate_managed_service(dict(response["data"]))
+
+
+class GateSessionsAPI(_BaseAPI):
+    def create(
+        self,
+        *,
+        service_id: str,
+        account_name: str,
+        delivery: dict[str, Any],
+        metadata: dict[str, Any] | None = None,
+    ) -> GateSessionCreate:
+        body = {
+            "service_id": service_id,
+            "account_name": account_name,
+            "delivery": delivery,
+        }
+        if metadata is not None:
+            body["metadata"] = metadata
+        response = self._client._request_json("POST", "/v1/gate/sessions", body=body, auth_mode="none")
+        return _parse_gate_session_create(dict(response["data"]))
+
+    def poll(self, gate_session_id: str, *, poll_token: str) -> GateSessionPollData:
+        response = self._client._request_json(
+            "GET",
+            f"/v1/gate/sessions/{gate_session_id}",
+            auth_mode="bearer",
+            bearer_token=poll_token,
+        )
+        return _parse_gate_session_poll(dict(response["data"]))
+
+    def acknowledge(self, gate_session_id: str, *, poll_token: str, ack_token: str) -> GateSessionDeliveryAcknowledgement:
+        response = self._client._request_json(
+            "POST",
+            f"/v1/gate/sessions/{gate_session_id}/ack",
+            body={"ack_token": ack_token},
+            auth_mode="bearer",
+            bearer_token=poll_token,
+        )
+        return _parse_gate_session_delivery_acknowledgement(dict(response["data"]))
+
+
+class GateLoginSessionsAPI(_BaseAPI):
+    def create(self, *, service_id: str, agent_token: str) -> GateLoginSession:
+        response = self._client._request_json(
+            "POST",
+            "/v1/gate/login-sessions",
+            body={"service_id": service_id},
+            auth_mode="bearer",
+            bearer_token=agent_token,
+        )
+        return _parse_gate_login_session(dict(response["data"]))
+
+    def consume(self, *, code: str) -> GateDashboardLogin:
+        response = self._client._request_json(
+            "POST",
+            "/v1/gate/login-sessions/consume",
+            body={"code": code},
+        )
+        return _parse_gate_dashboard_login(dict(response["data"]))
+
+
+class GateAgentTokensAPI(_BaseAPI):
+    def verify(self, *, agent_token: str) -> AgentTokenVerification:
+        response = self._client._request_json(
+            "POST",
+            "/v1/gate/agent-tokens/verify",
+            body={"agent_token": agent_token},
+        )
+        return _parse_agent_token_verification(dict(response["data"]))
+
+    def revoke(self, *, agent_token: str) -> None:
+        self._client._request_json(
+            "POST",
+            "/v1/gate/agent-tokens/revoke",
+            body={"agent_token": agent_token},
+            expect_content=False,
+        )
+
+
+class GateAPI(_BaseAPI):
+    def __init__(self, client: "Tripwire") -> None:
+        super().__init__(client)
+        self.registry = GateRegistryAPI(client)
+        self.services = GateServicesAPI(client)
+        self.sessions = GateSessionsAPI(client)
+        self.login_sessions = GateLoginSessionsAPI(client)
+        self.agent_tokens = GateAgentTokensAPI(client)
+
+
 class Tripwire:
     def __init__(
         self,
@@ -484,19 +764,14 @@ class Tripwire:
         transport: httpx.BaseTransport | None = None,
     ) -> None:
         resolved_secret = secret_key or os.getenv("TRIPWIRE_SECRET_KEY")
-        if not resolved_secret:
-            raise TripwireConfigurationError(
-                "Missing Tripwire secret key. Pass secret_key explicitly or set TRIPWIRE_SECRET_KEY."
-            )
-
         headers = {
-            "Authorization": f"Bearer {resolved_secret}",
             "Accept": "application/json",
             "X-Tripwire-Client": SDK_CLIENT_HEADER,
         }
         if user_agent:
             headers["User-Agent"] = user_agent
 
+        self._secret_key = resolved_secret
         self._client = httpx.Client(
             base_url=base_url or DEFAULT_BASE_URL,
             timeout=timeout,
@@ -506,6 +781,7 @@ class Tripwire:
         self.sessions = SessionsAPI(self)
         self.fingerprints = FingerprintsAPI(self)
         self.teams = TeamsAPI(self)
+        self.gate = GateAPI(self)
 
     def close(self) -> None:
         self._client.close()
@@ -524,8 +800,21 @@ class Tripwire:
         query: dict[str, Any] | None = None,
         body: dict[str, Any] | None = None,
         expect_content: bool = True,
+        auth_mode: str = "secret",
+        bearer_token: str | None = None,
     ) -> dict[str, Any]:
-        response = self._client.request(method, path, params=query, json=body)
+        headers: dict[str, str] = {}
+        if auth_mode == "bearer":
+            if not bearer_token:
+                raise TripwireConfigurationError("Missing bearer token for this Tripwire request.")
+            headers["Authorization"] = f"Bearer {bearer_token}"
+        elif auth_mode == "secret":
+            if not self._secret_key:
+                raise TripwireConfigurationError(
+                    "Missing Tripwire secret key. Pass secret_key explicitly or set TRIPWIRE_SECRET_KEY."
+                )
+            headers["Authorization"] = f"Bearer {self._secret_key}"
+        response = self._client.request(method, path, params=query, json=body, headers=headers)
         request_id = response.headers.get("x-request-id")
 
         if response.status_code >= 400:
