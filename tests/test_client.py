@@ -43,8 +43,20 @@ class ClientTests(unittest.TestCase):
     def test_missing_secret_raises(self) -> None:
         original = os.environ.pop("TRIPWIRE_SECRET_KEY", None)
         try:
+            client = Tripwire()
+            self.assertIsNotNone(client.gate)
+            client.close()
+        finally:
+            if original is not None:
+                os.environ["TRIPWIRE_SECRET_KEY"] = original
+
+    def test_secret_endpoints_raise_at_request_time_when_no_secret_is_configured(self) -> None:
+        original = os.environ.pop("TRIPWIRE_SECRET_KEY", None)
+        try:
+            client = Tripwire(transport=httpx.MockTransport(lambda _request: json_response({})))
             with self.assertRaises(TripwireConfigurationError):
-                Tripwire()
+                client.sessions.list()
+            client.close()
         finally:
             if original is not None:
                 os.environ["TRIPWIRE_SECRET_KEY"] = original
@@ -188,6 +200,130 @@ class ClientTests(unittest.TestCase):
                 client.teams.api_keys.rotate("team_56789abcdefghjkmnpqrstvwxy", "key_6789abcdefghjkmnpqrstvwxyz").secret_key,
                 "sk_live_rotated",
             )
+        finally:
+            client.close()
+
+    def test_gate_namespace_supports_public_bearer_and_secret_flows(self) -> None:
+        registry_list_fixture = load_fixture("api/gate/registry-list.json")
+        registry_detail_fixture = load_fixture("api/gate/registry-detail.json")
+        services_list_fixture = load_fixture("api/gate/services-list.json")
+        service_detail_fixture = load_fixture("api/gate/service-detail.json")
+        service_create_fixture = load_fixture("api/gate/service-create.json")
+        service_update_fixture = load_fixture("api/gate/service-update.json")
+        service_disable_fixture = load_fixture("api/gate/service-disable.json")
+        session_create_fixture = load_fixture("api/gate/session-create.json")
+        session_poll_fixture = load_fixture("api/gate/session-poll.json")
+        session_ack_fixture = load_fixture("api/gate/session-ack.json")
+        login_create_fixture = load_fixture("api/gate/login-session-create.json")
+        login_consume_fixture = load_fixture("api/gate/login-session-consume.json")
+        agent_verify_fixture = load_fixture("api/gate/agent-token-verify.json")
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            path = request.url.path
+            auth = request.headers.get("Authorization")
+            if path == "/v1/gate/registry":
+                self.assertIsNone(auth)
+                return json_response(registry_list_fixture)
+            if path == "/v1/gate/registry/tripwire":
+                self.assertIsNone(auth)
+                return json_response(registry_detail_fixture)
+            if path == "/v1/gate/services" and request.method == "GET":
+                self.assertEqual(auth, "Bearer sk_live_test")
+                return json_response(services_list_fixture)
+            if path == "/v1/gate/services/tripwire" and request.method == "GET":
+                self.assertEqual(auth, "Bearer sk_live_test")
+                return json_response(service_detail_fixture)
+            if path == "/v1/gate/services" and request.method == "POST":
+                self.assertEqual(auth, "Bearer sk_live_test")
+                return json_response(service_create_fixture, status_code=201)
+            if path == "/v1/gate/services/acme_prod" and request.method == "PATCH":
+                self.assertEqual(auth, "Bearer sk_live_test")
+                return json_response(service_update_fixture)
+            if path == "/v1/gate/services/acme_prod" and request.method == "DELETE":
+                self.assertEqual(auth, "Bearer sk_live_test")
+                return json_response(service_disable_fixture)
+            if path == "/v1/gate/sessions":
+                self.assertIsNone(auth)
+                return json_response(session_create_fixture, status_code=201)
+            if path == "/v1/gate/sessions/gate_0123456789abcdefghjkmnpqrs":
+                self.assertEqual(auth, "Bearer gtpoll_0123456789abcdefghjkmnpqrs")
+                return json_response(session_poll_fixture)
+            if path == "/v1/gate/sessions/gate_0123456789abcdefghjkmnpqrs/ack":
+                self.assertEqual(auth, "Bearer gtpoll_0123456789abcdefghjkmnpqrs")
+                return json_response(session_ack_fixture)
+            if path == "/v1/gate/login-sessions":
+                self.assertEqual(auth, "Bearer agt_0123456789abcdefghjkmnpqrs")
+                return json_response(login_create_fixture, status_code=201)
+            if path == "/v1/gate/login-sessions/consume":
+                self.assertEqual(auth, "Bearer sk_live_test")
+                return json_response(login_consume_fixture)
+            if path == "/v1/gate/agent-tokens/verify":
+                self.assertEqual(auth, "Bearer sk_live_test")
+                return json_response(agent_verify_fixture)
+            if path == "/v1/gate/agent-tokens/revoke":
+                self.assertEqual(auth, "Bearer sk_live_test")
+                return httpx.Response(status_code=204)
+            raise AssertionError(f"Unexpected request: {request.method} {path}")
+
+        client = Tripwire(secret_key="sk_live_test", transport=httpx.MockTransport(handler))
+        try:
+            self.assertEqual(client.gate.registry.list()[0].id, "tripwire")
+            self.assertEqual(client.gate.registry.get("tripwire").id, "tripwire")
+            self.assertEqual(client.gate.services.list()[0].id, "acme_prod")
+            self.assertEqual(client.gate.services.get("tripwire").id, "acme_prod")
+            self.assertEqual(
+                client.gate.services.create(
+                    id="acme_prod",
+                    name="Acme Production",
+                    description="Acme production signup flow",
+                    website="https://acme.example.com",
+                    webhook_url="https://api.acme.example.com/v1/gate/webhook",
+                ).id,
+                "acme_prod",
+            )
+            self.assertTrue(client.gate.services.update("acme_prod", discoverable=True).discoverable)
+            self.assertEqual(client.gate.services.disable("acme_prod").status, "disabled")
+            self.assertEqual(
+                client.gate.sessions.create(
+                    service_id="tripwire",
+                    account_name="my-project",
+                    delivery={
+                        "version": 1,
+                        "algorithm": "x25519-hkdf-sha256/aes-256-gcm",
+                        "key_id": "kid_integrator_0123456789abcdefgh",
+                        "public_key": "public_key_integrator",
+                    },
+                ).id,
+                "gate_0123456789abcdefghjkmnpqrs",
+            )
+            self.assertEqual(
+                client.gate.sessions.poll(
+                    "gate_0123456789abcdefghjkmnpqrs",
+                    poll_token="gtpoll_0123456789abcdefghjkmnpqrs",
+                ).status,
+                "approved",
+            )
+            self.assertEqual(
+                client.gate.sessions.acknowledge(
+                    "gate_0123456789abcdefghjkmnpqrs",
+                    poll_token="gtpoll_0123456789abcdefghjkmnpqrs",
+                    ack_token="gtack_0123456789abcdefghjkmnpqrs",
+                ).status,
+                "acknowledged",
+            )
+            self.assertEqual(
+                client.gate.login_sessions.create(
+                    service_id="tripwire",
+                    agent_token="agt_0123456789abcdefghjkmnpqrs",
+                ).object,
+                "gate_login_session",
+            )
+            self.assertEqual(
+                client.gate.login_sessions.consume(code="gate_code_0123456789abcdefghjkm").object,
+                "gate_dashboard_login",
+            )
+            self.assertTrue(client.gate.agent_tokens.verify(agent_token="agt_0123456789abcdefghjkmnpqrs").valid)
+            self.assertIsNone(client.gate.agent_tokens.revoke(agent_token="agt_0123456789abcdefghjkmnpqrs"))
         finally:
             client.close()
 
