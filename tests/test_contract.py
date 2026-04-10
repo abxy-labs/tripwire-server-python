@@ -7,6 +7,18 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 
 
+def strip_examples(value):
+    if isinstance(value, list):
+        return [strip_examples(item) for item in value]
+    if isinstance(value, dict):
+        return {
+            key: strip_examples(item)
+            for key, item in value.items()
+            if key != "example"
+        }
+    return value
+
+
 class ContractTests(unittest.TestCase):
     @staticmethod
     def _read_spec() -> dict:
@@ -84,9 +96,9 @@ class ContractTests(unittest.TestCase):
         self.assertEqual(schemas["TeamId"]["pattern"], "^team_[0123456789abcdefghjkmnpqrstvwxyz]{26}$")
         self.assertEqual(schemas["ApiKeyId"]["pattern"], "^key_[0123456789abcdefghjkmnpqrstvwxyz]{26}$")
 
-        self.assertEqual(schemas["SessionSummary"]["properties"]["id"], {"$ref": "#/components/schemas/SessionId"})
-        self.assertEqual(schemas["Team"]["properties"]["status"], {"$ref": "#/components/schemas/TeamStatus"})
-        self.assertEqual(schemas["ApiKey"]["properties"]["status"], {"$ref": "#/components/schemas/ApiKeyStatus"})
+        self.assertEqual(strip_examples(schemas["SessionSummary"]["properties"]["id"]), {"$ref": "#/components/schemas/SessionId"})
+        self.assertEqual(strip_examples(schemas["Team"]["properties"]["status"]), {"$ref": "#/components/schemas/TeamStatus"})
+        self.assertEqual(strip_examples(schemas["ApiKey"]["properties"]["status"]), {"$ref": "#/components/schemas/ApiKeyStatus"})
         self.assertEqual(
             schemas["PublicError"]["properties"]["code"]["x-tripwire-known-values-ref"],
             "#/components/schemas/KnownPublicErrorCode",
@@ -99,19 +111,19 @@ class ContractTests(unittest.TestCase):
             )
         )
         self.assertEqual(
-            schemas["SessionDetail"]["properties"]["request"],
+            strip_examples(schemas["SessionDetail"]["properties"]["request"]),
             {"$ref": "#/components/schemas/SessionDetailRequest"},
         )
         self.assertEqual(
-            schemas["SessionDetail"]["properties"]["client_telemetry"],
+            strip_examples(schemas["SessionDetail"]["properties"]["client_telemetry"]),
             {"$ref": "#/components/schemas/SessionClientTelemetry"},
         )
         self.assertEqual(
-            schemas["SessionDetail"]["properties"]["automation"],
+            strip_examples(schemas["SessionDetail"]["properties"]["automation"]),
             {"anyOf": [{"$ref": "#/components/schemas/SessionAutomation"}, {"type": "null"}]},
         )
         self.assertEqual(
-            schemas["SessionDetail"]["properties"]["signals_fired"],
+            strip_examples(schemas["SessionDetail"]["properties"]["signals_fired"]),
             {"type": "array", "items": {"$ref": "#/components/schemas/SessionSignalFired"}},
         )
         self.assertEqual(schemas["SessionSignalFired"]["properties"]["signal"]["type"], "string")
