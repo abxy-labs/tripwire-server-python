@@ -168,7 +168,7 @@ class VisitorFingerprintDetail(VisitorFingerprintSummary):
 
 
 @dataclass(frozen=True)
-class Team:
+class Organization:
     object: str
     id: str
     name: str
@@ -182,20 +182,25 @@ class Team:
 class ApiKey:
     object: str
     id: str
-    public_key: str
+    type: str
     name: str
     environment: str
     allowed_origins: list[str] | None
+    scopes: list[str] | None
     rate_limit: int | None
     status: str
+    key_preview: str
+    display_key: str | None
+    last_used_at: str | None
     created_at: str
     rotated_at: str | None
     revoked_at: str | None
+    grace_expires_at: str | None
 
 
 @dataclass(frozen=True)
 class IssuedApiKey(ApiKey):
-    secret_key: str
+    revealed_key: str
 
 
 @dataclass(frozen=True)
@@ -351,6 +356,23 @@ class WebhookDelivery:
     error: str | None
     created_at: str
     updated_at: str
+
+
+@dataclass(frozen=True)
+class EventSubject:
+    type: str
+    id: str
+
+
+@dataclass(frozen=True)
+class Event:
+    object: str
+    id: str
+    type: str
+    subject: EventSubject
+    data: dict[str, Any]
+    webhook_deliveries: list[WebhookDelivery]
+    created_at: str
 
 
 @dataclass(frozen=True)

@@ -12,6 +12,8 @@ from .types import (
     Attribution,
     Decision,
     DecisionManipulation,
+    Event,
+    EventSubject,
     GateDashboardLogin,
     GateDeliveryBundle,
     GateDeliveryEnvelope,
@@ -33,7 +35,7 @@ from .types import (
     SessionDecision,
     SessionDetailRequest,
     SessionSummary,
-    Team,
+    Organization,
     VerifiedTripwireSignal,
     VerificationResult,
     VerifiedTripwireToken,
@@ -259,8 +261,8 @@ def _parse_visitor_fingerprint_detail(data: dict[str, Any]) -> VisitorFingerprin
     )
 
 
-def _parse_team(data: dict[str, Any]) -> Team:
-    return Team(
+def _parse_organization(data: dict[str, Any]) -> Organization:
+    return Organization(
         object=str(data["object"]),
         id=str(data["id"]),
         name=str(data["name"]),
@@ -275,23 +277,28 @@ def _parse_api_key(data: dict[str, Any]) -> ApiKey:
     return ApiKey(
         object=str(data["object"]),
         id=str(data["id"]),
-        public_key=str(data["public_key"]),
+        type=str(data["type"]),
         name=str(data["name"]),
         environment=str(data["environment"]),
         allowed_origins=[str(value) for value in data.get("allowed_origins", [])]
         if data.get("allowed_origins") is not None
         else None,
+        scopes=[str(value) for value in data.get("scopes", [])] if data.get("scopes") is not None else None,
         rate_limit=int(data["rate_limit"]) if isinstance(data.get("rate_limit"), int) else None,
         status=str(data["status"]),
+        key_preview=str(data["key_preview"]),
+        display_key=data.get("display_key"),
+        last_used_at=data.get("last_used_at"),
         created_at=str(data["created_at"]),
         rotated_at=data.get("rotated_at"),
         revoked_at=data.get("revoked_at"),
+        grace_expires_at=data.get("grace_expires_at"),
     )
 
 
 def _parse_issued_api_key(data: dict[str, Any]) -> IssuedApiKey:
     api_key = _parse_api_key(data)
-    return IssuedApiKey(**api_key.__dict__, secret_key=str(data["secret_key"]))
+    return IssuedApiKey(**api_key.__dict__, revealed_key=str(data["revealed_key"]))
 
 
 def _parse_gate_service_env_var(data: dict[str, Any]) -> GateServiceEnvVar:
@@ -391,6 +398,29 @@ def _parse_webhook_delivery(data: dict[str, Any]) -> WebhookDelivery:
         error=data.get("error") if isinstance(data.get("error"), str) or data.get("error") is None else None,
         created_at=str(data["created_at"]),
         updated_at=str(data["updated_at"]),
+    )
+
+
+def _parse_event_subject(data: dict[str, Any]) -> EventSubject:
+    return EventSubject(
+        type=str(data["type"]),
+        id=str(data["id"]),
+    )
+
+
+def _parse_event(data: dict[str, Any]) -> Event:
+    return Event(
+        object=str(data["object"]),
+        id=str(data["id"]),
+        type=str(data["type"]),
+        subject=_parse_event_subject(dict(data["subject"])),
+        data=dict(data.get("data", {})) if isinstance(data.get("data"), dict) else {},
+        webhook_deliveries=[
+            _parse_webhook_delivery(dict(item))
+            for item in data.get("webhook_deliveries", [])
+            if isinstance(item, dict)
+        ],
+        created_at=str(data["created_at"]),
     )
 
 
@@ -597,22 +627,24 @@ class FingerprintsAPI(_BaseAPI):
 class ApiKeysAPI(_BaseAPI):
     def create(
         self,
-        team_id: str,
+        organization_id: str,
         *,
-        name: str | None = None,
+        name: str,
+        type: str | None = None,
         environment: str | None = None,
         allowed_origins: list[str] | None = None,
-        rate_limit: int | None = None,
+        scopes: list[str] | None = None,
     ) -> IssuedApiKey:
         response = self._client._request_json(
             "POST",
-            f"/v1/teams/{team_id}/api-keys",
+            f"/v1/organizations/{organization_id}/api-keys",
             body=_compact_query(
                 {
                     "name": name,
+                    "type": type,
                     "environment": environment,
                     "allowed_origins": allowed_origins,
-                    "rate_limit": rate_limit,
+                    "scopes": scopes,
                 }
             ),
         )
@@ -620,14 +652,14 @@ class ApiKeysAPI(_BaseAPI):
 
     def list(
         self,
-        team_id: str,
+        organization_id: str,
         *,
         limit: int | None = None,
         cursor: str | None = None,
     ) -> ListResult[ApiKey]:
         response = self._client._request_json(
             "GET",
-            f"/v1/teams/{team_id}/api-keys",
+            f"/v1/organizations/{organization_id}/api-keys",
             query=_compact_query({"limit": limit, "cursor": cursor}),
         )
         return _normalize_list(
@@ -635,51 +667,67 @@ class ApiKeysAPI(_BaseAPI):
             dict(response["pagination"]),
         )
 
-    def revoke(self, team_id: str, key_id: str) -> ApiKey:
+    def update(
+        self,
+        organization_id: str,
+        key_id: str,
+        *,
+        name: str | None = None,
+        allowed_origins: list[str] | None = None,
+        scopes: list[str] | None = None,
+    ) -> ApiKey:
         response = self._client._request_json(
-            "DELETE",
-            f"/v1/teams/{team_id}/api-keys/{key_id}",
+            "PATCH",
+            f"/v1/organizations/{organization_id}/api-keys/{key_id}",
+            body=_compact_query({"name": name, "allowed_origins": allowed_origins, "scopes": scopes}),
         )
         return _parse_api_key(dict(response["data"]))
 
-    def rotate(self, team_id: str, key_id: str) -> IssuedApiKey:
+    def revoke(self, organization_id: str, key_id: str) -> ApiKey:
+        response = self._client._request_json(
+            "DELETE",
+            f"/v1/organizations/{organization_id}/api-keys/{key_id}",
+        )
+        return _parse_api_key(dict(response["data"]))
+
+    def rotate(self, organization_id: str, key_id: str) -> IssuedApiKey:
         response = self._client._request_json(
             "POST",
-            f"/v1/teams/{team_id}/api-keys/{key_id}/rotations",
+            f"/v1/organizations/{organization_id}/api-keys/{key_id}/rotations",
         )
         return _parse_issued_api_key(dict(response["data"]))
 
 
-class TeamsAPI(_BaseAPI):
+class OrganizationsAPI(_BaseAPI):
     def __init__(self, client: "Tripwire") -> None:
         super().__init__(client)
         self.api_keys = ApiKeysAPI(client)
 
-    def create(self, *, name: str, slug: str) -> Team:
+    def create(self, *, name: str, slug: str) -> Organization:
         response = self._client._request_json(
             "POST",
-            "/v1/teams",
+            "/v1/organizations",
             body={"name": name, "slug": slug},
         )
-        return _parse_team(dict(response["data"]))
+        return _parse_organization(dict(response["data"]))
 
-    def get(self, team_id: str) -> Team:
-        response = self._client._request_json("GET", f"/v1/teams/{team_id}")
-        return _parse_team(dict(response["data"]))
+    def get(self, organization_id: str) -> Organization:
+        response = self._client._request_json("GET", f"/v1/organizations/{organization_id}")
+        return _parse_organization(dict(response["data"]))
 
     def update(
         self,
-        team_id: str,
+        organization_id: str,
         *,
         name: str | None = None,
         status: str | None = None,
-    ) -> Team:
+    ) -> Organization:
         response = self._client._request_json(
             "PATCH",
-            f"/v1/teams/{team_id}",
+            f"/v1/organizations/{organization_id}",
             body=_compact_query({"name": name, "status": status}),
         )
-        return _parse_team(dict(response["data"]))
+        return _parse_organization(dict(response["data"]))
 
 
 class GateRegistryAPI(_BaseAPI):
@@ -853,22 +901,27 @@ class WebhooksAPI(_BaseAPI):
         )
         return _parse_webhook_test(dict(response["data"]))
 
-    def list_deliveries(
+    def list_events(
         self,
         organization_id: str,
         *,
         endpoint_id: str | None = None,
+        type: str | None = None,
         limit: int | None = None,
-    ) -> ListResult[WebhookDelivery]:
+    ) -> ListResult[Event]:
         response = self._client._request_json(
             "GET",
-            f"/v1/organizations/{organization_id}/webhooks/deliveries",
-            query=_compact_query({"endpoint_id": endpoint_id, "limit": limit}),
+            f"/v1/organizations/{organization_id}/events",
+            query=_compact_query({"endpoint_id": endpoint_id, "type": type, "limit": limit}),
         )
         return _normalize_list(
-            [_parse_webhook_delivery(dict(item)) for item in response["data"]],
+            [_parse_event(dict(item)) for item in response["data"]],
             dict(response["pagination"]),
         )
+
+    def retrieve_event(self, organization_id: str, event_id: str) -> Event:
+        response = self._client._request_json("GET", f"/v1/organizations/{organization_id}/events/{event_id}")
+        return _parse_event(dict(response["data"]))
 
 
 class Tripwire:
@@ -898,7 +951,7 @@ class Tripwire:
         )
         self.sessions = SessionsAPI(self)
         self.fingerprints = FingerprintsAPI(self)
-        self.teams = TeamsAPI(self)
+        self.organizations = OrganizationsAPI(self)
         self.gate = GateAPI(self)
         self.webhooks = WebhooksAPI(self)
 

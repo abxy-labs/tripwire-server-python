@@ -149,57 +149,130 @@ class ClientTests(unittest.TestCase):
         finally:
             client.close()
 
-    def test_teams_and_api_keys(self) -> None:
-        team_fixture = load_fixture("api/teams/team.json")
-        team_create_fixture = load_fixture("api/teams/team-create.json")
-        team_update_fixture = load_fixture("api/teams/team-update.json")
-        key_create_fixture = load_fixture("api/teams/api-key-create.json")
-        key_list_fixture = load_fixture("api/teams/api-key-list.json")
-        key_rotate_fixture = load_fixture("api/teams/api-key-rotate.json")
+    def test_organizations_and_api_keys(self) -> None:
+        organization_fixture = load_fixture("api/organizations/organization.json")
+        organization_create_fixture = load_fixture("api/organizations/organization-create.json")
+        organization_update_fixture = load_fixture("api/organizations/organization-update.json")
+        key_create_fixture = load_fixture("api/organizations/api-key-create.json")
+        key_list_fixture = load_fixture("api/organizations/api-key-list.json")
+        key_update_fixture = load_fixture("api/organizations/api-key-update.json")
+        key_rotate_fixture = load_fixture("api/organizations/api-key-rotate.json")
 
         def handler(request: httpx.Request) -> httpx.Response:
             path = request.url.path
             method = request.method
-            if path.endswith("/v1/teams") and method == "POST":
-                return json_response(team_create_fixture, status_code=201)
-            if path.endswith("/v1/teams/team_56789abcdefghjkmnpqrstvwxy") and method == "PATCH":
-                return json_response(team_update_fixture)
-            if path.endswith("/v1/teams/team_56789abcdefghjkmnpqrstvwxy") and method == "GET":
-                return json_response(team_fixture)
-            if path.endswith("/v1/teams/team_56789abcdefghjkmnpqrstvwxy/api-keys/key_6789abcdefghjkmnpqrstvwxyz/rotations"):
+            if path.endswith("/v1/organizations") and method == "POST":
+                return json_response(organization_create_fixture, status_code=201)
+            if path.endswith("/v1/organizations/org_56789abcdefghjkmnpqrstvwxy") and method == "PATCH":
+                return json_response(organization_update_fixture)
+            if path.endswith("/v1/organizations/org_56789abcdefghjkmnpqrstvwxy") and method == "GET":
+                return json_response(organization_fixture)
+            if path.endswith("/v1/organizations/org_56789abcdefghjkmnpqrstvwxy/api-keys/key_6789abcdefghjkmnpqrstvwxyz/rotations"):
                 return json_response(key_rotate_fixture, status_code=201)
-            if path.endswith("/v1/teams/team_56789abcdefghjkmnpqrstvwxy/api-keys/key_6789abcdefghjkmnpqrstvwxyz"):
-                return json_response(load_fixture("api/teams/api-key-revoke.json"))
-            if path.endswith("/v1/teams/team_56789abcdefghjkmnpqrstvwxy/api-keys") and method == "POST":
+            if path.endswith("/v1/organizations/org_56789abcdefghjkmnpqrstvwxy/api-keys/key_6789abcdefghjkmnpqrstvwxyz") and method == "PATCH":
+                return json_response(key_update_fixture)
+            if path.endswith("/v1/organizations/org_56789abcdefghjkmnpqrstvwxy/api-keys/key_6789abcdefghjkmnpqrstvwxyz"):
+                return json_response(load_fixture("api/organizations/api-key-revoke.json"))
+            if path.endswith("/v1/organizations/org_56789abcdefghjkmnpqrstvwxy/api-keys") and method == "POST":
                 return json_response(key_create_fixture, status_code=201)
-            if path.endswith("/v1/teams/team_56789abcdefghjkmnpqrstvwxy/api-keys"):
+            if path.endswith("/v1/organizations/org_56789abcdefghjkmnpqrstvwxy/api-keys"):
                 return json_response(key_list_fixture)
             raise AssertionError(f"Unexpected request: {method} {path}")
 
         client = Tripwire(secret_key="sk_live_test", transport=httpx.MockTransport(handler))
         try:
-            self.assertEqual(client.teams.get("team_56789abcdefghjkmnpqrstvwxy").id, "team_56789abcdefghjkmnpqrstvwxy")
+            self.assertEqual(client.organizations.get("org_56789abcdefghjkmnpqrstvwxy").id, "org_56789abcdefghjkmnpqrstvwxy")
             self.assertEqual(
-                client.teams.create(name="Example Team", slug="example-team").updated_at,
+                client.organizations.create(name="Example Organization", slug="example-organization").updated_at,
                 "2026-03-24T19:10:00.000Z",
             )
             self.assertEqual(
-                client.teams.update("team_56789abcdefghjkmnpqrstvwxy", name="Updated Example Team").name,
-                "Example Team",
+                client.organizations.update("org_56789abcdefghjkmnpqrstvwxy", name="Updated Example Organization").name,
+                "Example Organization",
             )
             self.assertEqual(
-                client.teams.api_keys.create("team_56789abcdefghjkmnpqrstvwxy", name="Production").secret_key,
-                "sk_live_example",
+                client.organizations.api_keys.create("org_56789abcdefghjkmnpqrstvwxy", name="Production").revealed_key,
+                "sk_live_[example_secret_key]",
             )
-            self.assertEqual(client.teams.api_keys.list("team_56789abcdefghjkmnpqrstvwxy").items[0].id, "key_6789abcdefghjkmnpqrstvwxyz")
+            self.assertEqual(client.organizations.api_keys.list("org_56789abcdefghjkmnpqrstvwxy").items[0].id, "key_6789abcdefghjkmnpqrstvwxyz")
             self.assertEqual(
-                client.teams.api_keys.revoke("team_56789abcdefghjkmnpqrstvwxy", "key_6789abcdefghjkmnpqrstvwxyz").id,
+                client.organizations.api_keys.update(
+                    "org_56789abcdefghjkmnpqrstvwxy",
+                    "key_6789abcdefghjkmnpqrstvwxyz",
+                    name="Updated Web App",
+                ).name,
+                "Updated Web App",
+            )
+            self.assertEqual(
+                client.organizations.api_keys.revoke("org_56789abcdefghjkmnpqrstvwxy", "key_6789abcdefghjkmnpqrstvwxyz").id,
                 "key_6789abcdefghjkmnpqrstvwxyz",
             )
             self.assertEqual(
-                client.teams.api_keys.rotate("team_56789abcdefghjkmnpqrstvwxy", "key_6789abcdefghjkmnpqrstvwxyz").secret_key,
-                "sk_live_rotated",
+                client.organizations.api_keys.rotate("org_56789abcdefghjkmnpqrstvwxy", "key_6789abcdefghjkmnpqrstvwxyz").revealed_key,
+                "sk_live_[rotated_example_secret_key]",
             )
+        finally:
+            client.close()
+
+    def test_webhooks_use_event_history_endpoints(self) -> None:
+        delivery = {
+            "object": "webhook_delivery",
+            "id": "wdlv_0123456789abcdef0123456789abcdef",
+            "event_id": "wevt_0123456789abcdef0123456789abcdef",
+            "endpoint_id": "we_0123456789abcdef0123456789abcdef",
+            "event_type": "session.fingerprint.calculated",
+            "status": "succeeded",
+            "attempts": 1,
+            "response_status": 200,
+            "response_body": "{}",
+            "error": None,
+            "created_at": "2026-03-24T20:00:00.000Z",
+            "updated_at": "2026-03-24T20:00:05.000Z",
+        }
+        event = {
+            "object": "event",
+            "id": "wevt_0123456789abcdef0123456789abcdef",
+            "type": "session.fingerprint.calculated",
+            "subject": {"type": "session", "id": "sid_0123456789abcdefghjkmnpqrs"},
+            "data": {"source": "waitForFingerprint"},
+            "webhook_deliveries": [delivery],
+            "created_at": "2026-03-24T20:00:00.000Z",
+        }
+        list_response = {
+            "data": [event],
+            "pagination": {"limit": 25, "has_more": False},
+            "meta": {"request_id": "req_0123456789abcdef0123456789abcdef"},
+        }
+        detail_response = {
+            "data": event,
+            "meta": {"request_id": "req_0123456789abcdef0123456789abcdef"},
+        }
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            self.assertEqual(request.headers["Authorization"], "Bearer sk_live_test")
+            if request.url.path == "/v1/organizations/org_56789abcdefghjkmnpqrstvwxy/events":
+                self.assertEqual(request.url.params.get("endpoint_id"), "we_0123456789abcdef0123456789abcdef")
+                self.assertEqual(request.url.params.get("type"), "session.fingerprint.calculated")
+                return json_response(list_response)
+            if request.url.path == "/v1/organizations/org_56789abcdefghjkmnpqrstvwxy/events/wevt_0123456789abcdef0123456789abcdef":
+                return json_response(detail_response)
+            raise AssertionError(f"Unexpected request: {request.method} {request.url.path}")
+
+        client = Tripwire(secret_key="sk_live_test", transport=httpx.MockTransport(handler))
+        try:
+            page = client.webhooks.list_events(
+                "org_56789abcdefghjkmnpqrstvwxy",
+                endpoint_id="we_0123456789abcdef0123456789abcdef",
+                type="session.fingerprint.calculated",
+                limit=25,
+            )
+            self.assertEqual(page.items[0].subject.id, "sid_0123456789abcdefghjkmnpqrs")
+            self.assertEqual(page.items[0].webhook_deliveries[0].status, "succeeded")
+            fetched = client.webhooks.retrieve_event(
+                "org_56789abcdefghjkmnpqrstvwxy",
+                "wevt_0123456789abcdef0123456789abcdef",
+            )
+            self.assertEqual(fetched.type, "session.fingerprint.calculated")
         finally:
             client.close()
 
