@@ -47,6 +47,9 @@ from .types import (
     VisitorFingerprintSessionSummary,
     VisitorFingerprintStorage,
     VisitorFingerprintSummary,
+    WebhookDelivery,
+    WebhookEndpoint,
+    WebhookTest,
 )
 
 DEFAULT_BASE_URL = "https://api.tripwirejs.com"
@@ -350,9 +353,54 @@ def _parse_gate_managed_service(data: dict[str, Any]) -> GateManagedService:
     return GateManagedService(
         **entry.__dict__,
         object=str(data["object"]),
-        webhook_url=str(data["webhook_url"]),
+        webhook_endpoint_id=data.get("webhook_endpoint_id")
+        if isinstance(data.get("webhook_endpoint_id"), str) or data.get("webhook_endpoint_id") is None
+        else None,
         created_at=str(data["created_at"]),
         updated_at=str(data["updated_at"]),
+    )
+
+
+def _parse_webhook_endpoint(data: dict[str, Any]) -> WebhookEndpoint:
+    return WebhookEndpoint(
+        object=str(data["object"]),
+        id=str(data["id"]),
+        name=str(data["name"]),
+        url=str(data["url"]),
+        status=str(data["status"]),
+        event_types=[str(item) for item in data.get("event_types", [])],
+        signing_secret=data.get("signing_secret") if isinstance(data.get("signing_secret"), str) else None,
+        created_at=str(data["created_at"]),
+        updated_at=str(data["updated_at"]),
+    )
+
+
+def _parse_webhook_delivery(data: dict[str, Any]) -> WebhookDelivery:
+    return WebhookDelivery(
+        object=str(data["object"]),
+        id=str(data["id"]),
+        event_id=str(data["event_id"]),
+        endpoint_id=str(data["endpoint_id"]),
+        event_type=str(data["event_type"]),
+        status=str(data["status"]),
+        attempts=int(data["attempts"]),
+        response_status=int(data["response_status"]) if isinstance(data.get("response_status"), int) else None,
+        response_body=data.get("response_body")
+        if isinstance(data.get("response_body"), str) or data.get("response_body") is None
+        else None,
+        error=data.get("error") if isinstance(data.get("error"), str) or data.get("error") is None else None,
+        created_at=str(data["created_at"]),
+        updated_at=str(data["updated_at"]),
+    )
+
+
+def _parse_webhook_test(data: dict[str, Any]) -> WebhookTest:
+    latest_delivery = data.get("latest_delivery")
+    return WebhookTest(
+        object=str(data["object"]),
+        event_id=str(data["event_id"]),
+        delivery_ids=[str(item) for item in data.get("delivery_ids", [])],
+        latest_delivery=_parse_webhook_delivery(dict(latest_delivery)) if isinstance(latest_delivery, dict) else None,
     )
 
 
@@ -753,6 +801,76 @@ class GateAPI(_BaseAPI):
         self.agent_tokens = GateAgentTokensAPI(client)
 
 
+class WebhooksAPI(_BaseAPI):
+    def list_endpoints(self, organization_id: str) -> ListResult[WebhookEndpoint]:
+        response = self._client._request_json("GET", f"/v1/organizations/{organization_id}/webhooks/endpoints")
+        return _normalize_list(
+            [_parse_webhook_endpoint(dict(item)) for item in response["data"]],
+            dict(response["pagination"]),
+        )
+
+    def create_endpoint(
+        self,
+        organization_id: str,
+        *,
+        name: str,
+        url: str,
+        event_types: list[str],
+    ) -> WebhookEndpoint:
+        response = self._client._request_json(
+            "POST",
+            f"/v1/organizations/{organization_id}/webhooks/endpoints",
+            body={"name": name, "url": url, "event_types": event_types},
+        )
+        return _parse_webhook_endpoint(dict(response["data"]))
+
+    def update_endpoint(self, organization_id: str, endpoint_id: str, **body: Any) -> WebhookEndpoint:
+        response = self._client._request_json(
+            "PATCH",
+            f"/v1/organizations/{organization_id}/webhooks/endpoints/{endpoint_id}",
+            body=body,
+        )
+        return _parse_webhook_endpoint(dict(response["data"]))
+
+    def disable_endpoint(self, organization_id: str, endpoint_id: str) -> WebhookEndpoint:
+        response = self._client._request_json(
+            "DELETE",
+            f"/v1/organizations/{organization_id}/webhooks/endpoints/{endpoint_id}",
+        )
+        return _parse_webhook_endpoint(dict(response["data"]))
+
+    def rotate_secret(self, organization_id: str, endpoint_id: str) -> WebhookEndpoint:
+        response = self._client._request_json(
+            "POST",
+            f"/v1/organizations/{organization_id}/webhooks/endpoints/{endpoint_id}/rotations",
+        )
+        return _parse_webhook_endpoint(dict(response["data"]))
+
+    def send_test(self, organization_id: str, endpoint_id: str) -> WebhookTest:
+        response = self._client._request_json(
+            "POST",
+            f"/v1/organizations/{organization_id}/webhooks/endpoints/{endpoint_id}/test",
+        )
+        return _parse_webhook_test(dict(response["data"]))
+
+    def list_deliveries(
+        self,
+        organization_id: str,
+        *,
+        endpoint_id: str | None = None,
+        limit: int | None = None,
+    ) -> ListResult[WebhookDelivery]:
+        response = self._client._request_json(
+            "GET",
+            f"/v1/organizations/{organization_id}/webhooks/deliveries",
+            query=_compact_query({"endpoint_id": endpoint_id, "limit": limit}),
+        )
+        return _normalize_list(
+            [_parse_webhook_delivery(dict(item)) for item in response["data"]],
+            dict(response["pagination"]),
+        )
+
+
 class Tripwire:
     def __init__(
         self,
@@ -782,6 +900,7 @@ class Tripwire:
         self.fingerprints = FingerprintsAPI(self)
         self.teams = TeamsAPI(self)
         self.gate = GateAPI(self)
+        self.webhooks = WebhooksAPI(self)
 
     def close(self) -> None:
         self._client.close()

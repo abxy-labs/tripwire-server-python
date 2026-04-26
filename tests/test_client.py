@@ -277,7 +277,7 @@ class ClientTests(unittest.TestCase):
                     name="Acme Production",
                     description="Acme production signup flow",
                     website="https://acme.example.com",
-                    webhook_url="https://api.acme.example.com/v1/gate/webhook",
+                    webhook_endpoint_id="we_0123456789abcdef0123456789abcdef",
                 ).id,
                 "acme_prod",
             )

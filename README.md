@@ -115,6 +115,7 @@ from tripwire_server import (
     create_delivery_key_pair,
     create_gate_approved_webhook_response,
     decrypt_gate_delivery_envelope,
+    parse_webhook_event,
     verify_gate_webhook_signature,
 )
 
@@ -130,14 +131,17 @@ response = create_gate_approved_webhook_response(
 )
 payload = decrypt_gate_delivery_envelope(key_pair.private_key, response.encrypted_delivery)
 print(payload.outputs["TRIPWIRE_SECRET_KEY"])
+raw_body = '{"id":"wevt_123","object":"webhook_event","type":"webhook.test","created":"2026-04-26T00:00:00.000Z","data":{}}'
 print(
     verify_gate_webhook_signature(
         secret="whsec_test",
         timestamp="1735776000",
-        raw_body='{"event":"gate.session.approved"}',
+        raw_body=raw_body,
         signature="…",
     )
 )
+event = parse_webhook_event(raw_body)
+print(event.type)
 ```
 
 ### Error handling

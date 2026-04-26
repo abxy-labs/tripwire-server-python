@@ -12,8 +12,10 @@ from tripwire_server import (
     import_delivery_private_key_pkcs8,
     is_blocked_gate_env_var_key,
     is_gate_managed_env_var_key,
+    parse_webhook_event,
     validate_gate_approved_webhook_payload,
     validate_gate_delivery_request,
+    verify_and_parse_webhook_event,
     verify_gate_webhook_signature,
 )
 
@@ -42,6 +44,18 @@ class GateDeliveryTests(unittest.TestCase):
         validated = validate_gate_approved_webhook_payload(payload_fixture)
         self.assertEqual(validated.service_id, payload_fixture["service_id"])
         self.assertEqual(validated.gate_session_id, payload_fixture["gate_session_id"])
+        event = parse_webhook_event(signature_fixture["raw_body"])
+        self.assertEqual(event.object, "webhook_event")
+        self.assertEqual(event.type, "gate.session.approved")
+        self.assertEqual(event.data.service_id, payload_fixture["service_id"])
+        parsed = verify_and_parse_webhook_event(
+            secret=signature_fixture["secret"],
+            timestamp=signature_fixture["timestamp"],
+            raw_body=signature_fixture["raw_body"],
+            signature=signature_fixture["signature"],
+            now_seconds=signature_fixture["now_seconds"],
+        )
+        self.assertEqual(parsed.type, "gate.session.approved")
 
         self.assertTrue(
             verify_gate_webhook_signature(

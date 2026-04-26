@@ -19,9 +19,11 @@ from .gate_delivery import (
     is_blocked_gate_env_var_key,
     is_gate_managed_env_var_key,
     key_id_for_raw_x25519_public_key,
+    parse_webhook_event,
     validate_encrypted_gate_delivery_envelope,
     validate_gate_approved_webhook_payload,
     validate_gate_delivery_request,
+    verify_and_parse_webhook_event,
     verify_gate_webhook_signature,
 )
 from .sealed_token import safe_verify_tripwire_token, verify_tripwire_token
@@ -55,6 +57,10 @@ from .types import (
     VerifiedTripwireToken,
     VisitorFingerprintDetail,
     VisitorFingerprintSummary,
+    WebhookDelivery,
+    WebhookEndpoint,
+    WebhookEventEnvelope,
+    WebhookTest,
 )
 
 __all__ = [
@@ -94,6 +100,10 @@ __all__ = [
     "VerifiedTripwireToken",
     "VisitorFingerprintDetail",
     "VisitorFingerprintSummary",
+    "WebhookDelivery",
+    "WebhookEndpoint",
+    "WebhookEventEnvelope",
+    "WebhookTest",
     "create_delivery_key_pair",
     "create_encrypted_delivery_response",
     "create_gate_approved_webhook_response",
@@ -105,9 +115,11 @@ __all__ = [
     "is_blocked_gate_env_var_key",
     "is_gate_managed_env_var_key",
     "key_id_for_raw_x25519_public_key",
+    "parse_webhook_event",
     "validate_encrypted_gate_delivery_envelope",
     "validate_gate_approved_webhook_payload",
     "validate_gate_delivery_request",
+    "verify_and_parse_webhook_event",
     "verify_gate_webhook_signature",
     "verify_tripwire_token",
     "safe_verify_tripwire_token",
