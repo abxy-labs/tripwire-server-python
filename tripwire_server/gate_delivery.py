@@ -21,6 +21,7 @@ from .types import (
     GateDeliveryRequest,
     GateEncryptedDeliveryResponse,
     GeneratedDeliveryKeyPair,
+    WebhookEventEnvelope,
 )
 
 GATE_DELIVERY_VERSION = 1
@@ -243,8 +244,6 @@ def decrypt_gate_delivery_envelope(
 
 def validate_gate_approved_webhook_payload(value: GateApprovedWebhookPayload | dict[str, Any]) -> GateApprovedWebhookPayload:
     payload = _coerce_gate_approved_webhook_payload(value)
-    if payload.event != "gate.session.approved":
-        raise ValueError("event must be gate.session.approved")
     if not payload.service_id:
         raise ValueError("service_id is required")
     if not payload.gate_session_id:
@@ -256,7 +255,6 @@ def validate_gate_approved_webhook_payload(value: GateApprovedWebhookPayload | d
     if payload.tripwire.verdict not in {"bot", "human", "inconclusive"}:
         raise ValueError("tripwire.verdict is invalid")
     return GateApprovedWebhookPayload(
-        event="gate.session.approved",
         service_id=payload.service_id,
         gate_session_id=payload.gate_session_id,
         gate_account_id=payload.gate_account_id,
@@ -288,6 +286,61 @@ def verify_gate_webhook_signature(
         return False
     expected = hmac.new(secret.encode("utf-8"), f"{timestamp}.{raw_body}".encode("utf-8"), hashlib.sha256).hexdigest()
     return hmac.compare_digest(expected, signature)
+
+
+def parse_webhook_event(raw_body: str | bytes | dict[str, Any]) -> WebhookEventEnvelope:
+    if isinstance(raw_body, bytes):
+        value = json.loads(raw_body.decode("utf-8"))
+    elif isinstance(raw_body, str):
+        value = json.loads(raw_body)
+    else:
+        value = raw_body
+    if not isinstance(value, dict):
+        raise ValueError("webhook event envelope must be an object")
+    if value.get("object") != "webhook_event":
+        raise ValueError("webhook event object must be webhook_event")
+    if not isinstance(value.get("id"), str) or not value["id"]:
+        raise ValueError("webhook event id is required")
+    if not isinstance(value.get("type"), str) or not value["type"]:
+        raise ValueError("webhook event type is required")
+    if not isinstance(value.get("created"), str) or not value["created"]:
+        raise ValueError("webhook event created timestamp is required")
+    data = value.get("data")
+    if not isinstance(data, dict):
+        raise ValueError("webhook event data must be an object")
+    parsed_data: dict[str, Any] | GateApprovedWebhookPayload
+    if value["type"] == "gate.session.approved":
+        parsed_data = validate_gate_approved_webhook_payload(data)
+    else:
+        parsed_data = data
+    return WebhookEventEnvelope(
+        id=value["id"],
+        object="webhook_event",
+        type=value["type"],
+        created=value["created"],
+        data=parsed_data,
+    )
+
+
+def verify_and_parse_webhook_event(
+    *,
+    secret: str,
+    timestamp: str,
+    raw_body: str,
+    signature: str,
+    max_age_seconds: int = 5 * 60,
+    now_seconds: int | None = None,
+) -> WebhookEventEnvelope:
+    if not verify_gate_webhook_signature(
+        secret=secret,
+        timestamp=timestamp,
+        raw_body=raw_body,
+        signature=signature,
+        max_age_seconds=max_age_seconds,
+        now_seconds=now_seconds,
+    ):
+        raise ValueError("Invalid Tripwire webhook signature")
+    return parse_webhook_event(raw_body)
 
 
 def _coerce_gate_delivery_request(value: GateDeliveryRequest | dict[str, Any]) -> GateDeliveryRequest:
@@ -337,6 +390,8 @@ def _coerce_gate_delivery_payload(value: GateDeliveryPayload | dict[str, Any]) -
 def _coerce_gate_approved_webhook_payload(value: GateApprovedWebhookPayload | dict[str, Any]) -> GateApprovedWebhookPayload:
     if isinstance(value, GateApprovedWebhookPayload):
         return value
+    if "event" in value:
+        raise ValueError("webhook payload must not include event; use the webhook event envelope type")
     tripwire = value.get("tripwire")
     if not isinstance(tripwire, dict):
         raise ValueError("tripwire must be an object")
@@ -344,7 +399,6 @@ def _coerce_gate_approved_webhook_payload(value: GateApprovedWebhookPayload | di
     if metadata is not None and not isinstance(metadata, dict):
         raise ValueError("metadata must be an object or null")
     return GateApprovedWebhookPayload(
-        event=str(value.get("event", "")),
         service_id=str(value.get("service_id", "")),
         gate_session_id=str(value.get("gate_session_id", "")),
         gate_account_id=str(value.get("gate_account_id", "")),

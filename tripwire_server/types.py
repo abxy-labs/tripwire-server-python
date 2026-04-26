@@ -168,7 +168,7 @@ class VisitorFingerprintDetail(VisitorFingerprintSummary):
 
 
 @dataclass(frozen=True)
-class Team:
+class Organization:
     object: str
     id: str
     name: str
@@ -182,20 +182,25 @@ class Team:
 class ApiKey:
     object: str
     id: str
-    public_key: str
+    type: str
     name: str
     environment: str
     allowed_origins: list[str] | None
+    scopes: list[str] | None
     rate_limit: int | None
     status: str
+    key_preview: str
+    display_key: str | None
+    last_used_at: str | None
     created_at: str
     rotated_at: str | None
     revoked_at: str | None
+    grace_expires_at: str | None
 
 
 @dataclass(frozen=True)
 class IssuedApiKey(ApiKey):
-    secret_key: str
+    revealed_key: str
 
 
 @dataclass(frozen=True)
@@ -253,7 +258,7 @@ class GateManagedService:
     description: str
     website: str
     dashboard_login_url: str | None
-    webhook_url: str
+    webhook_endpoint_id: str | None
     env_vars: list[GateServiceEnvVar]
     docs_url: str
     sdks: list[GateServiceSdkInstall]
@@ -315,7 +320,6 @@ class GateApprovedWebhookTripwire:
 
 @dataclass(frozen=True)
 class GateApprovedWebhookPayload:
-    event: str
     service_id: str
     gate_session_id: str
     gate_account_id: str
@@ -323,6 +327,69 @@ class GateApprovedWebhookPayload:
     metadata: dict[str, Any] | None
     tripwire: GateApprovedWebhookTripwire
     delivery: GateDeliveryRequest
+
+
+@dataclass(frozen=True)
+class WebhookEndpoint:
+    object: str
+    id: str
+    name: str
+    url: str
+    status: str
+    event_types: list[str]
+    created_at: str
+    updated_at: str
+    signing_secret: str | None = None
+
+
+@dataclass(frozen=True)
+class WebhookDelivery:
+    object: str
+    id: str
+    event_id: str
+    endpoint_id: str
+    event_type: str
+    status: str
+    attempts: int
+    response_status: int | None
+    response_body: str | None
+    error: str | None
+    created_at: str
+    updated_at: str
+
+
+@dataclass(frozen=True)
+class EventSubject:
+    type: str
+    id: str
+
+
+@dataclass(frozen=True)
+class Event:
+    object: str
+    id: str
+    type: str
+    subject: EventSubject
+    data: dict[str, Any]
+    webhook_deliveries: list[WebhookDelivery]
+    created_at: str
+
+
+@dataclass(frozen=True)
+class WebhookTest:
+    object: str
+    event_id: str
+    delivery_ids: list[str]
+    latest_delivery: WebhookDelivery | None
+
+
+@dataclass(frozen=True)
+class WebhookEventEnvelope:
+    id: str
+    object: str
+    type: str
+    created: str
+    data: dict[str, Any] | GateApprovedWebhookPayload
 
 
 @dataclass(frozen=True)

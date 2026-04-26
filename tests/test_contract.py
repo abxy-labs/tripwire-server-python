@@ -42,13 +42,19 @@ class ContractTests(unittest.TestCase):
                 "/v1/gate/sessions",
                 "/v1/gate/sessions/{gateSessionId}",
                 "/v1/gate/sessions/{gateSessionId}/ack",
+                "/v1/organizations",
+                "/v1/organizations/{organizationId}",
+                "/v1/organizations/{organizationId}/api-keys",
+                "/v1/organizations/{organizationId}/api-keys/{keyId}",
+                "/v1/organizations/{organizationId}/api-keys/{keyId}/rotations",
+                "/v1/organizations/{organizationId}/events",
+                "/v1/organizations/{organizationId}/events/{eventId}",
+                "/v1/organizations/{organizationId}/webhooks/endpoints",
+                "/v1/organizations/{organizationId}/webhooks/endpoints/{endpointId}",
+                "/v1/organizations/{organizationId}/webhooks/endpoints/{endpointId}/rotations",
+                "/v1/organizations/{organizationId}/webhooks/endpoints/{endpointId}/test",
                 "/v1/sessions",
                 "/v1/sessions/{sessionId}",
-                "/v1/teams",
-                "/v1/teams/{teamId}",
-                "/v1/teams/{teamId}/api-keys",
-                "/v1/teams/{teamId}/api-keys/{keyId}",
-                "/v1/teams/{teamId}/api-keys/{keyId}/rotations",
             ],
         )
 
@@ -76,13 +82,14 @@ class ContractTests(unittest.TestCase):
             "api/gate/login-session-consume.json",
             "api/gate/agent-token-verify.json",
             "api/gate/agent-token-revoke.json",
-            "api/teams/team.json",
-            "api/teams/team-create.json",
-            "api/teams/team-update.json",
-            "api/teams/api-key-create.json",
-            "api/teams/api-key-list.json",
-            "api/teams/api-key-rotate.json",
-            "api/teams/api-key-revoke.json",
+            "api/organizations/organization.json",
+            "api/organizations/organization-create.json",
+            "api/organizations/organization-update.json",
+            "api/organizations/api-key-create.json",
+            "api/organizations/api-key-list.json",
+            "api/organizations/api-key-update.json",
+            "api/organizations/api-key-rotate.json",
+            "api/organizations/api-key-revoke.json",
         ]
         for relative_path in fixtures:
             with self.subTest(relative_path=relative_path):
@@ -93,18 +100,18 @@ class ContractTests(unittest.TestCase):
 
         self.assertEqual(schemas["SessionId"]["pattern"], "^sid_[0123456789abcdefghjkmnpqrstvwxyz]{26}$")
         self.assertEqual(schemas["FingerprintId"]["pattern"], "^vid_[0123456789abcdefghjkmnpqrstvwxyz]{26}$")
-        self.assertEqual(schemas["TeamId"]["pattern"], "^team_[0123456789abcdefghjkmnpqrstvwxyz]{26}$")
+        self.assertEqual(schemas["OrganizationId"]["pattern"], "^org_[0123456789abcdefghjkmnpqrstvwxyz]{26}$")
         self.assertEqual(schemas["ApiKeyId"]["pattern"], "^key_[0123456789abcdefghjkmnpqrstvwxyz]{26}$")
 
         self.assertEqual(strip_examples(schemas["SessionSummary"]["properties"]["id"]), {"$ref": "#/components/schemas/SessionId"})
-        self.assertEqual(strip_examples(schemas["Team"]["properties"]["status"]), {"$ref": "#/components/schemas/TeamStatus"})
+        self.assertEqual(strip_examples(schemas["Organization"]["properties"]["status"]), {"$ref": "#/components/schemas/OrganizationStatus"})
         self.assertEqual(strip_examples(schemas["ApiKey"]["properties"]["status"]), {"$ref": "#/components/schemas/ApiKeyStatus"})
         self.assertEqual(
             schemas["PublicError"]["properties"]["code"]["x-tripwire-known-values-ref"],
             "#/components/schemas/KnownPublicErrorCode",
         )
-        self.assertEqual(schemas["TeamStatus"]["enum"], ["active", "suspended", "deleted"])
-        self.assertEqual(schemas["ApiKeyStatus"]["enum"], ["active", "revoked", "rotated"])
+        self.assertEqual(schemas["OrganizationStatus"]["enum"], ["active", "suspended", "deleted"])
+        self.assertEqual(schemas["ApiKeyStatus"]["enum"], ["active", "rotating", "revoked"])
         self.assertTrue(
             {"decision", "highlights", "automation", "web_bot_auth", "network", "runtime_integrity", "visitor_fingerprint", "connection_fingerprint", "previous_decisions", "request", "browser", "device", "analysis_coverage", "signals_fired", "client_telemetry"}.issubset(
                 set(schemas["SessionDetail"]["required"])
@@ -128,8 +135,19 @@ class ContractTests(unittest.TestCase):
         )
         self.assertEqual(schemas["SessionSignalFired"]["properties"]["signal"]["type"], "string")
         self.assertTrue(
-            {"allowed_origins", "rate_limit", "rotated_at", "revoked_at"}.issubset(set(schemas["ApiKey"]["required"]))
+            {
+                "type",
+                "allowed_origins",
+                "scopes",
+                "key_preview",
+                "last_used_at",
+                "rate_limit",
+                "rotated_at",
+                "revoked_at",
+                "grace_expires_at",
+            }.issubset(set(schemas["ApiKey"]["required"]))
         )
+        self.assertIn("revealed_key", schemas["IssuedApiKey"]["required"])
         self.assertNotIn("team_id", schemas["GateManagedService"]["properties"])
         self.assertNotIn("webhook_secret", schemas["GateManagedService"]["properties"])
         self.assertNotIn("CollectBatchResponse", schemas)
@@ -141,13 +159,18 @@ class ContractTests(unittest.TestCase):
         self.assertEqual(paths["/v1/sessions"]["get"]["tags"], ["Sessions"])
         self.assertEqual(paths["/v1/fingerprints/{visitorId}"]["get"]["operationId"], "getVisitorFingerprint")
         self.assertEqual(paths["/v1/fingerprints/{visitorId}"]["get"]["tags"], ["Visitor fingerprints"])
-        self.assertEqual(paths["/v1/teams/{teamId}"]["patch"]["operationId"], "updateTeam")
-        self.assertEqual(paths["/v1/teams/{teamId}"]["patch"]["tags"], ["Teams"])
+        self.assertEqual(paths["/v1/organizations/{organizationId}"]["patch"]["operationId"], "updateOrganization")
+        self.assertEqual(paths["/v1/organizations/{organizationId}"]["patch"]["tags"], ["Organizations"])
         self.assertEqual(
-            paths["/v1/teams/{teamId}/api-keys/{keyId}/rotations"]["post"]["operationId"],
-            "rotateTeamApiKey",
+            paths["/v1/organizations/{organizationId}/api-keys/{keyId}"]["patch"]["operationId"],
+            "updateOrganizationApiKey",
         )
-        self.assertEqual(paths["/v1/teams/{teamId}/api-keys/{keyId}/rotations"]["post"]["tags"], ["API Keys"])
+        self.assertEqual(paths["/v1/organizations/{organizationId}/api-keys/{keyId}"]["patch"]["tags"], ["API Keys"])
+        self.assertEqual(
+            paths["/v1/organizations/{organizationId}/api-keys/{keyId}/rotations"]["post"]["operationId"],
+            "rotateOrganizationApiKey",
+        )
+        self.assertEqual(paths["/v1/organizations/{organizationId}/api-keys/{keyId}/rotations"]["post"]["tags"], ["API Keys"])
         self.assertEqual(paths["/v1/gate/services"]["post"]["operationId"], "createManagedGateService")
         self.assertEqual(paths["/v1/gate/services"]["post"]["tags"], ["Gate"])
         self.assertEqual(paths["/v1/gate/sessions/{gateSessionId}"]["get"]["operationId"], "pollGateSession")

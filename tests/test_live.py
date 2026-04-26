@@ -16,21 +16,21 @@ def require_env(name: str) -> str:
     return value
 
 
-def best_effort_revoke(client: Tripwire, team_id: str, key_id: str | None) -> None:
+def best_effort_revoke(client: Tripwire, organization_id: str, key_id: str | None) -> None:
     if not key_id:
         return
     try:
-        client.teams.api_keys.revoke(team_id, key_id)
+        client.organizations.api_keys.revoke(organization_id, key_id)
     except TripwireApiError as error:
         if error.status == 404 or error.code == "request.not_found":
             return
         raise
 
 
-def find_api_key(client: Tripwire, team_id: str, key_id: str):
+def find_api_key(client: Tripwire, organization_id: str, key_id: str):
     cursor: str | None = None
     while True:
-        page = client.teams.api_keys.list(team_id, limit=100, cursor=cursor)
+        page = client.organizations.api_keys.list(organization_id, limit=100, cursor=cursor)
         for item in page.items:
             if item.id == key_id:
                 return item
@@ -46,14 +46,14 @@ class LiveSmokeTests(unittest.TestCase):
             secret_key=require_env("TRIPWIRE_SMOKE_SECRET_KEY"),
             base_url=os.getenv("TRIPWIRE_SMOKE_BASE_URL", "https://api.tripwirejs.com"),
         )
-        team_id = require_env("TRIPWIRE_SMOKE_TEAM_ID")
+        organization_id = require_env("TRIPWIRE_SMOKE_ORGANIZATION_ID")
 
         created_key_id: str | None = None
         rotated_key_id: str | None = None
 
         try:
             sessions = client.sessions.list(limit=1)
-            self.assertGreater(len(sessions.items), 0, "Smoke team must have at least one session for the live smoke suite.")
+            self.assertGreater(len(sessions.items), 0, "Smoke organization must have at least one session for the live smoke suite.")
             session_summary = sessions.items[0]
             session = client.sessions.get(session_summary.id)
             self.assertEqual(session.id, session_summary.id)
@@ -62,34 +62,34 @@ class LiveSmokeTests(unittest.TestCase):
             self.assertGreater(
                 len(fingerprints.items),
                 0,
-                "Smoke team must have at least one fingerprint for the live smoke suite.",
+                "Smoke organization must have at least one fingerprint for the live smoke suite.",
             )
             fingerprint_summary = fingerprints.items[0]
             fingerprint = client.fingerprints.get(fingerprint_summary.id)
             self.assertEqual(fingerprint.id, fingerprint_summary.id)
 
-            team = client.teams.get(team_id)
-            self.assertEqual(team.id, team_id)
-            updated_team = client.teams.update(team_id, name=team.name, status=team.status)
-            self.assertEqual(updated_team.name, team.name)
-            self.assertEqual(updated_team.status, team.status)
+            organization = client.organizations.get(organization_id)
+            self.assertEqual(organization.id, organization_id)
+            updated_organization = client.organizations.update(organization_id, name=organization.name, status=organization.status)
+            self.assertEqual(updated_organization.name, organization.name)
+            self.assertEqual(updated_organization.status, organization.status)
 
-            created_key = client.teams.api_keys.create(
-                team_id,
+            created_key = client.organizations.api_keys.create(
+                organization_id,
                 name=f"sdk-smoke-{int(time.time() * 1000):x}",
                 environment="test",
             )
             created_key_id = created_key.id
-            self.assertTrue(created_key.secret_key.startswith("sk_"))
+            self.assertTrue(created_key.revealed_key.startswith("sk_"))
 
-            listed_key = find_api_key(client, team_id, created_key.id)
+            listed_key = find_api_key(client, organization_id, created_key.id)
             self.assertIsNotNone(listed_key)
             if listed_key is not None:
                 self.assertEqual(listed_key.id, created_key.id)
 
-            rotated_key = client.teams.api_keys.rotate(team_id, created_key.id)
+            rotated_key = client.organizations.api_keys.rotate(organization_id, created_key.id)
             rotated_key_id = rotated_key.id
-            self.assertTrue(rotated_key.secret_key.startswith("sk_"))
+            self.assertTrue(rotated_key.revealed_key.startswith("sk_"))
 
             fixture = load_fixture("sealed-token/vector.v1.json")
             verified = safe_verify_tripwire_token(fixture["token"], fixture["secretKey"])
@@ -98,7 +98,7 @@ class LiveSmokeTests(unittest.TestCase):
                 self.assertEqual(verified.data.session_id, fixture["payload"]["session_id"])
                 self.assertEqual(verified.data.decision.event_id, fixture["payload"]["decision"]["event_id"])
         finally:
-            best_effort_revoke(client, team_id, rotated_key_id)
+            best_effort_revoke(client, organization_id, rotated_key_id)
             if created_key_id != rotated_key_id:
-                best_effort_revoke(client, team_id, created_key_id)
+                best_effort_revoke(client, organization_id, created_key_id)
             client.close()
