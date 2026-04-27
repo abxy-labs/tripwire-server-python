@@ -58,6 +58,12 @@ BLOCKED_GATE_ENV_VAR_KEYS = {
 }
 BLOCKED_GATE_ENV_VAR_PREFIXES = ("NPM_CONFIG_", "BUN_CONFIG_", "GIT_CONFIG_")
 GATE_DELIVERY_HKDF_INFO = b"tripwire-gate-delivery:v1"
+WEBHOOK_EVENT_TYPES = {
+    "session.fingerprint.calculated",
+    "session.result.persisted",
+    "gate.session.approved",
+    "webhook.test",
+}
 
 
 def derive_gate_agent_token_env_key(service_id: str) -> str:
@@ -303,6 +309,8 @@ def parse_webhook_event(raw_body: str | bytes | dict[str, Any]) -> WebhookEventE
         raise ValueError("webhook event id is required")
     if not isinstance(value.get("type"), str) or not value["type"]:
         raise ValueError("webhook event type is required")
+    if value["type"] not in WEBHOOK_EVENT_TYPES:
+        raise ValueError(f"unsupported webhook event type: {value['type']}")
     if not isinstance(value.get("created"), str) or not value["created"]:
         raise ValueError("webhook event created timestamp is required")
     data = value.get("data")

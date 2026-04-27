@@ -87,6 +87,12 @@ class SessionDetail:
     web_bot_auth: dict[str, Any] | None
     network: dict[str, Any]
     runtime_integrity: dict[str, Any]
+    native_runtime_integrity: dict[str, Any] | None
+    native_app: dict[str, Any] | None
+    native_carrier: dict[str, Any] | None
+    native_motion_print: dict[str, Any] | None
+    device_identity: dict[str, Any] | None
+    install_id: str | None
     visitor_fingerprint: dict[str, Any] | None
     connection_fingerprint: dict[str, Any]
     previous_decisions: list[SessionDecision]
