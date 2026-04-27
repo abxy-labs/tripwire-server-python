@@ -84,6 +84,18 @@ class GateDeliveryTests(unittest.TestCase):
                 now_seconds=signature_fixture["now_seconds"],
             )
         )
+        with self.assertRaisesRegex(ValueError, "unsupported webhook event type"):
+            parse_webhook_event(
+                json.dumps(
+                    {
+                        "id": "wevt_0123456789abcdefghjkmnpqrs",
+                        "object": "webhook_event",
+                        "type": "unknown.event",
+                        "created": "2026-04-27T00:00:00.000Z",
+                        "data": {},
+                    }
+                )
+            )
 
         for entry in env_policy_fixture["derive_agent_token_env_key"]:
             self.assertEqual(derive_gate_agent_token_env_key(entry["service_id"]), entry["expected"])

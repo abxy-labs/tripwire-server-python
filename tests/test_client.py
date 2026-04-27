@@ -142,6 +142,12 @@ class ClientTests(unittest.TestCase):
         try:
             session = client.sessions.get("sid_0123456789abcdefghjkmnpqrs")
             self.assertEqual(session.id, "sid_0123456789abcdefghjkmnpqrs")
+            self.assertIsNone(session.native_runtime_integrity)
+            self.assertIsNone(session.native_app)
+            self.assertIsNone(session.native_carrier)
+            self.assertIsNone(session.native_motion_print)
+            self.assertIsNone(session.device_identity)
+            self.assertIsNone(session.install_id)
             fp_page = client.fingerprints.list()
             self.assertEqual(fp_page.items[0].id, "vid_456789abcdefghjkmnpqrstvwx")
             fp_detail = client.fingerprints.get("vid_456789abcdefghjkmnpqrstvwx")

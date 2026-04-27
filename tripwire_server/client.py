@@ -163,6 +163,16 @@ def _parse_session_detail(data: dict[str, Any]) -> SessionDetail:
         runtime_integrity=dict(data.get("runtime_integrity", {}))
         if isinstance(data.get("runtime_integrity"), dict)
         else {},
+        native_runtime_integrity=dict(data.get("native_runtime_integrity"))
+        if isinstance(data.get("native_runtime_integrity"), dict)
+        else None,
+        native_app=dict(data.get("native_app")) if isinstance(data.get("native_app"), dict) else None,
+        native_carrier=dict(data.get("native_carrier")) if isinstance(data.get("native_carrier"), dict) else None,
+        native_motion_print=dict(data.get("native_motion_print"))
+        if isinstance(data.get("native_motion_print"), dict)
+        else None,
+        device_identity=dict(data.get("device_identity")) if isinstance(data.get("device_identity"), dict) else None,
+        install_id=data.get("install_id") if isinstance(data.get("install_id"), str) else None,
         visitor_fingerprint=dict(data.get("visitor_fingerprint"))
         if isinstance(data.get("visitor_fingerprint"), dict)
         else None,
