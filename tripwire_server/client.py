@@ -157,7 +157,7 @@ def _parse_session_detail(data: dict[str, Any]) -> SessionDetail:
         created_at=data.get("created_at"),
         decision=_parse_session_decision(dict(data["decision"])),
         highlights=[dict(item) for item in data.get("highlights", []) if isinstance(item, dict)],
-        automation=dict(data.get("automation")) if isinstance(data.get("automation"), dict) else None,
+        attribution=dict(data.get("attribution")) if isinstance(data.get("attribution"), dict) else None,
         web_bot_auth=dict(data.get("web_bot_auth")) if isinstance(data.get("web_bot_auth"), dict) else None,
         network=dict(data.get("network", {})) if isinstance(data.get("network"), dict) else {},
         runtime_integrity=dict(data.get("runtime_integrity", {}))

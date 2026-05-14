@@ -113,7 +113,7 @@ class ContractTests(unittest.TestCase):
         self.assertEqual(schemas["OrganizationStatus"]["enum"], ["active", "suspended", "deleted"])
         self.assertEqual(schemas["ApiKeyStatus"]["enum"], ["active", "rotating", "revoked"])
         self.assertTrue(
-            {"decision", "highlights", "automation", "web_bot_auth", "network", "runtime_integrity", "visitor_fingerprint", "connection_fingerprint", "previous_decisions", "request", "browser", "device", "analysis_coverage", "signals_fired", "client_telemetry"}.issubset(
+            {"decision", "highlights", "attribution", "web_bot_auth", "network", "runtime_integrity", "visitor_fingerprint", "connection_fingerprint", "previous_decisions", "request", "browser", "device", "analysis_coverage", "signals_fired", "client_telemetry"}.issubset(
                 set(schemas["SessionDetail"]["required"])
             )
         )
@@ -126,8 +126,8 @@ class ContractTests(unittest.TestCase):
             {"$ref": "#/components/schemas/SessionClientTelemetry"},
         )
         self.assertEqual(
-            strip_examples(schemas["SessionDetail"]["properties"]["automation"]),
-            {"anyOf": [{"$ref": "#/components/schemas/SessionAutomation"}, {"type": "null"}]},
+            strip_examples(schemas["SessionDetail"]["properties"]["attribution"]),
+            {"anyOf": [{"$ref": "#/components/schemas/SessionAttribution"}, {"type": "null"}]},
         )
         self.assertEqual(
             strip_examples(schemas["SessionDetail"]["properties"]["signals_fired"]),

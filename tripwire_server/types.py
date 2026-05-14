@@ -83,7 +83,7 @@ class SessionDetail:
     created_at: str | None
     decision: SessionDecision
     highlights: list[dict[str, Any]]
-    automation: dict[str, Any] | None
+    attribution: dict[str, Any] | None
     web_bot_auth: dict[str, Any] | None
     network: dict[str, Any]
     runtime_integrity: dict[str, Any]
