@@ -4,16 +4,16 @@ from dataclasses import dataclass, field
 from typing import Any
 
 
-class TripwireConfigurationError(Exception):
+class FoilConfigurationError(Exception):
     """Raised when the client is missing required configuration."""
 
 
-class TripwireTokenVerificationError(Exception):
-    """Raised when a sealed Tripwire token cannot be verified."""
+class FoilTokenVerificationError(Exception):
+    """Raised when a sealed Foil token cannot be verified."""
 
 
 @dataclass(slots=True)
-class TripwireApiError(Exception):
+class FoilApiError(Exception):
     status: int
     code: str
     message: str

@@ -4,8 +4,8 @@ import os
 import time
 import unittest
 
-from tripwire_server import Tripwire, safe_verify_tripwire_token
-from tripwire_server.errors import TripwireApiError
+from foil_server import Foil, safe_verify_foil_token
+from foil_server.errors import FoilApiError
 from tests.test_helpers import load_fixture
 
 
@@ -16,18 +16,18 @@ def require_env(name: str) -> str:
     return value
 
 
-def best_effort_revoke(client: Tripwire, organization_id: str, key_id: str | None) -> None:
+def best_effort_revoke(client: Foil, organization_id: str, key_id: str | None) -> None:
     if not key_id:
         return
     try:
         client.organizations.api_keys.revoke(organization_id, key_id)
-    except TripwireApiError as error:
+    except FoilApiError as error:
         if error.status == 404 or error.code == "request.not_found":
             return
         raise
 
 
-def find_api_key(client: Tripwire, organization_id: str, key_id: str):
+def find_api_key(client: Foil, organization_id: str, key_id: str):
     cursor: str | None = None
     while True:
         page = client.organizations.api_keys.list(organization_id, limit=100, cursor=cursor)
@@ -42,9 +42,9 @@ def find_api_key(client: Tripwire, organization_id: str, key_id: str):
 @unittest.skipUnless(os.getenv("FOIL_LIVE_SMOKE") == "1", "Set FOIL_LIVE_SMOKE=1 to run live smoke tests.")
 class LiveSmokeTests(unittest.TestCase):
     def test_public_server_surface(self) -> None:
-        client = Tripwire(
+        client = Foil(
             secret_key=require_env("FOIL_SMOKE_SECRET_KEY"),
-            base_url=os.getenv("FOIL_SMOKE_BASE_URL", "https://api.tripwirejs.com"),
+            base_url=os.getenv("FOIL_SMOKE_BASE_URL", "https://api.usefoil.com"),
         )
         organization_id = require_env("FOIL_SMOKE_ORGANIZATION_ID")
 
@@ -92,7 +92,7 @@ class LiveSmokeTests(unittest.TestCase):
             self.assertTrue(rotated_key.revealed_key.startswith("sk_"))
 
             fixture = load_fixture("sealed-token/vector.v1.json")
-            verified = safe_verify_tripwire_token(fixture["token"], fixture["secretKey"])
+            verified = safe_verify_foil_token(fixture["token"], fixture["secretKey"])
             self.assertTrue(verified.ok)
             if verified.ok and verified.data is not None:
                 self.assertEqual(verified.data.session_id, fixture["payload"]["session_id"])

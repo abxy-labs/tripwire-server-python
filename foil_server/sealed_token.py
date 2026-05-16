@@ -9,8 +9,8 @@ import zlib
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 
 from .client import _parse_decision, _parse_request_context, _parse_score_breakdown, _parse_visitor_fingerprint_link
-from .errors import TripwireConfigurationError, TripwireTokenVerificationError
-from .types import Attribution, VerificationResult, VerifiedTripwireSignal, VerifiedTripwireToken
+from .errors import FoilConfigurationError, FoilTokenVerificationError
+from .types import Attribution, VerificationResult, VerifiedFoilSignal, VerifiedFoilToken
 
 VERSION = 0x01
 
@@ -18,8 +18,8 @@ VERSION = 0x01
 def _resolve_secret(secret_key: str | None) -> str:
     resolved = secret_key or os.getenv("FOIL_SECRET_KEY")
     if not resolved:
-        raise TripwireConfigurationError(
-            "Missing Tripwire secret key. Pass secret_key explicitly or set FOIL_SECRET_KEY."
+        raise FoilConfigurationError(
+            "Missing Foil secret key. Pass secret_key explicitly or set FOIL_SECRET_KEY."
         )
     return resolved
 
@@ -35,18 +35,18 @@ def _derive_key(secret_key_or_hash: str) -> bytes:
     return hashlib.sha256(material).digest()
 
 
-def _build_verified_token(payload: dict[str, object]) -> VerifiedTripwireToken:
+def _build_verified_token(payload: dict[str, object]) -> VerifiedFoilToken:
     request_raw = payload.get("request")
     decision_raw = payload.get("decision")
     if not isinstance(request_raw, dict) or not isinstance(decision_raw, dict):
-        raise TripwireTokenVerificationError("Tripwire token payload is invalid.")
+        raise FoilTokenVerificationError("Foil token payload is invalid.")
 
-    signals: list[VerifiedTripwireSignal] = []
+    signals: list[VerifiedFoilSignal] = []
     for signal_raw in payload.get("signals", []):
         if not isinstance(signal_raw, dict):
             continue
         signals.append(
-            VerifiedTripwireSignal(
+            VerifiedFoilSignal(
                 id=str(signal_raw.get("id", "")),
                 category=str(signal_raw.get("category", "")),
                 confidence=str(signal_raw.get("confidence", "")),
@@ -62,7 +62,7 @@ def _build_verified_token(payload: dict[str, object]) -> VerifiedTripwireToken:
     score_breakdown_raw = payload.get("score_breakdown")
     score_breakdown = _parse_score_breakdown(dict(score_breakdown_raw)) if isinstance(score_breakdown_raw, dict) else _parse_score_breakdown({})
 
-    return VerifiedTripwireToken(
+    return VerifiedFoilToken(
         object=str(payload.get("object", "")),
         session_id=str(payload.get("session_id", "")),
         decision=_parse_decision(dict(decision_raw)),
@@ -81,16 +81,16 @@ def _build_verified_token(payload: dict[str, object]) -> VerifiedTripwireToken:
     )
 
 
-def verify_tripwire_token(sealed_token: str, secret_key: str | None = None) -> VerifiedTripwireToken:
+def verify_foil_token(sealed_token: str, secret_key: str | None = None) -> VerifiedFoilToken:
     try:
         resolved_secret = _resolve_secret(secret_key)
         raw = base64.b64decode(sealed_token)
         if len(raw) < 29:
-            raise TripwireTokenVerificationError("Tripwire token is too short.")
+            raise FoilTokenVerificationError("Foil token is too short.")
 
         version = raw[0]
         if version != VERSION:
-            raise TripwireTokenVerificationError(f"Unsupported Tripwire token version: {version}")
+            raise FoilTokenVerificationError(f"Unsupported Foil token version: {version}")
 
         nonce = raw[1:13]
         ciphertext = raw[13:-16]
@@ -103,19 +103,19 @@ def verify_tripwire_token(sealed_token: str, secret_key: str | None = None) -> V
         compressed = decryptor.update(ciphertext) + decryptor.finalize()
         payload = json.loads(zlib.decompress(compressed).decode("utf-8"))
         if not isinstance(payload, dict):
-            raise TripwireTokenVerificationError("Tripwire token payload is invalid.")
+            raise FoilTokenVerificationError("Foil token payload is invalid.")
         return _build_verified_token(payload)
-    except (TripwireConfigurationError, TripwireTokenVerificationError):
+    except (FoilConfigurationError, FoilTokenVerificationError):
         raise
     except Exception as error:  # noqa: BLE001
-        raise TripwireTokenVerificationError("Failed to verify Tripwire token.") from error
+        raise FoilTokenVerificationError("Failed to verify Foil token.") from error
 
 
-def safe_verify_tripwire_token(
+def safe_verify_foil_token(
     sealed_token: str,
     secret_key: str | None = None,
 ) -> VerificationResult:
     try:
-        return VerificationResult(ok=True, data=verify_tripwire_token(sealed_token, secret_key))
-    except (TripwireConfigurationError, TripwireTokenVerificationError) as error:
+        return VerificationResult(ok=True, data=verify_foil_token(sealed_token, secret_key))
+    except (FoilConfigurationError, FoilTokenVerificationError) as error:
         return VerificationResult(ok=False, error=error)

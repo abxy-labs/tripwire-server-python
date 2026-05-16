@@ -107,7 +107,7 @@ class ContractTests(unittest.TestCase):
         self.assertEqual(strip_examples(schemas["Organization"]["properties"]["status"]), {"$ref": "#/components/schemas/OrganizationStatus"})
         self.assertEqual(strip_examples(schemas["ApiKey"]["properties"]["status"]), {"$ref": "#/components/schemas/ApiKeyStatus"})
         self.assertEqual(
-            schemas["PublicError"]["properties"]["code"]["x-tripwire-known-values-ref"],
+            schemas["PublicError"]["properties"]["code"]["x-foil-known-values-ref"],
             "#/components/schemas/KnownPublicErrorCode",
         )
         self.assertEqual(schemas["OrganizationStatus"]["enum"], ["active", "suspended", "deleted"])

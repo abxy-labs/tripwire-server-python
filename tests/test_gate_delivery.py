@@ -4,7 +4,7 @@ import json
 import unittest
 from pathlib import Path
 
-from tripwire_server import (
+from foil_server import (
     create_delivery_key_pair,
     create_gate_approved_webhook_response,
     decrypt_gate_delivery_envelope,
