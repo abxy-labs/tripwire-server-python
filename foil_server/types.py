@@ -319,7 +319,7 @@ class GateEncryptedDeliveryResponse:
 
 
 @dataclass(frozen=True)
-class GateApprovedWebhookTripwire:
+class GateApprovedWebhookFoil:
     verdict: str
     score: float | None
 
@@ -331,7 +331,7 @@ class GateApprovedWebhookPayload:
     gate_account_id: str
     account_name: str
     metadata: dict[str, Any] | None
-    tripwire: GateApprovedWebhookTripwire
+    foil: GateApprovedWebhookFoil
     delivery: GateDeliveryRequest
 
 
@@ -453,7 +453,7 @@ class AgentTokenVerification:
 
 
 @dataclass(frozen=True)
-class VerifiedTripwireSignal:
+class VerifiedFoilSignal:
     id: str
     category: str
     confidence: str
@@ -468,13 +468,13 @@ class Attribution:
 
 
 @dataclass(frozen=True)
-class VerifiedTripwireToken:
+class VerifiedFoilToken:
     object: str
     session_id: str
     decision: Decision
     request: RequestContext
     visitor_fingerprint: VisitorFingerprintLink | None
-    signals: list[VerifiedTripwireSignal]
+    signals: list[VerifiedFoilSignal]
     score_breakdown: ScoreBreakdown
     attribution: Attribution
     embed: dict[str, Any] | None
@@ -484,5 +484,5 @@ class VerifiedTripwireToken:
 @dataclass(frozen=True)
 class VerificationResult:
     ok: bool
-    data: VerifiedTripwireToken | None = None
+    data: VerifiedFoilToken | None = None
     error: Exception | None = None

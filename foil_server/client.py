@@ -5,7 +5,7 @@ from typing import Any, Iterator
 
 import httpx
 
-from .errors import TripwireApiError, TripwireConfigurationError
+from .errors import FoilApiError, FoilConfigurationError
 from .types import (
     ApiKey,
     AgentTokenVerification,
@@ -36,9 +36,9 @@ from .types import (
     SessionDetailRequest,
     SessionSummary,
     Organization,
-    VerifiedTripwireSignal,
+    VerifiedFoilSignal,
     VerificationResult,
-    VerifiedTripwireToken,
+    VerifiedFoilToken,
     VisitorFingerprintActivity,
     VisitorFingerprintAnchors,
     VisitorFingerprintComponents,
@@ -54,9 +54,9 @@ from .types import (
     WebhookTest,
 )
 
-DEFAULT_BASE_URL = "https://api.tripwirejs.com"
+DEFAULT_BASE_URL = "https://api.usefoil.com"
 DEFAULT_TIMEOUT = 30.0
-SDK_CLIENT_HEADER = "tripwire-server-python/0.1.0"
+SDK_CLIENT_HEADER = "foil-server-python/0.1.0"
 
 
 def _compact_query(query: dict[str, Any]) -> dict[str, Any]:
@@ -536,7 +536,7 @@ def _normalize_list(items: list[Any], pagination: dict[str, Any]) -> ListResult[
 
 
 class _BaseAPI:
-    def __init__(self, client: "Tripwire") -> None:
+    def __init__(self, client: "Foil") -> None:
         self._client = client
 
 
@@ -709,7 +709,7 @@ class ApiKeysAPI(_BaseAPI):
 
 
 class OrganizationsAPI(_BaseAPI):
-    def __init__(self, client: "Tripwire") -> None:
+    def __init__(self, client: "Foil") -> None:
         super().__init__(client)
         self.api_keys = ApiKeysAPI(client)
 
@@ -850,7 +850,7 @@ class GateAgentTokensAPI(_BaseAPI):
 
 
 class GateAPI(_BaseAPI):
-    def __init__(self, client: "Tripwire") -> None:
+    def __init__(self, client: "Foil") -> None:
         super().__init__(client)
         self.registry = GateRegistryAPI(client)
         self.services = GateServicesAPI(client)
@@ -934,7 +934,7 @@ class WebhooksAPI(_BaseAPI):
         return _parse_event(dict(response["data"]))
 
 
-class Tripwire:
+class Foil:
     def __init__(
         self,
         *,
@@ -944,10 +944,10 @@ class Tripwire:
         user_agent: str | None = None,
         transport: httpx.BaseTransport | None = None,
     ) -> None:
-        resolved_secret = secret_key or os.getenv("TRIPWIRE_SECRET_KEY")
+        resolved_secret = secret_key or os.getenv("FOIL_SECRET_KEY")
         headers = {
             "Accept": "application/json",
-            "X-Tripwire-Client": SDK_CLIENT_HEADER,
+            "X-Foil-Client": SDK_CLIENT_HEADER,
         }
         if user_agent:
             headers["User-Agent"] = user_agent
@@ -968,7 +968,7 @@ class Tripwire:
     def close(self) -> None:
         self._client.close()
 
-    def __enter__(self) -> "Tripwire":
+    def __enter__(self) -> "Foil":
         return self
 
     def __exit__(self, *_args: object) -> None:
@@ -988,12 +988,12 @@ class Tripwire:
         headers: dict[str, str] = {}
         if auth_mode == "bearer":
             if not bearer_token:
-                raise TripwireConfigurationError("Missing bearer token for this Tripwire request.")
+                raise FoilConfigurationError("Missing bearer token for this Foil request.")
             headers["Authorization"] = f"Bearer {bearer_token}"
         elif auth_mode == "secret":
             if not self._secret_key:
-                raise TripwireConfigurationError(
-                    "Missing Tripwire secret key. Pass secret_key explicitly or set TRIPWIRE_SECRET_KEY."
+                raise FoilConfigurationError(
+                    "Missing Foil secret key. Pass secret_key explicitly or set FOIL_SECRET_KEY."
                 )
             headers["Authorization"] = f"Bearer {self._secret_key}"
         response = self._client.request(method, path, params=query, json=body, headers=headers)
@@ -1009,7 +1009,7 @@ class Tripwire:
             if isinstance(payload.get("error"), dict):
                 error = payload["error"]
                 details = error.get("details")
-                raise TripwireApiError(
+                raise FoilApiError(
                     status=response.status_code,
                     code=str(error.get("code", "request.failed")),
                     message=str(error.get("message", response.text or response.reason_phrase)),
@@ -1019,7 +1019,7 @@ class Tripwire:
                     body=payload,
                 )
 
-            raise TripwireApiError(
+            raise FoilApiError(
                 status=response.status_code,
                 code="request.failed",
                 message=response.text or response.reason_phrase,

@@ -6,8 +6,8 @@ import unittest
 import httpx
 
 from tests.test_helpers import load_fixture
-from tripwire_server import Tripwire
-from tripwire_server.errors import TripwireApiError, TripwireConfigurationError
+from foil_server import Foil
+from foil_server.errors import FoilApiError, FoilConfigurationError
 
 
 def json_response(
@@ -24,58 +24,58 @@ def json_response(
 
 class ClientTests(unittest.TestCase):
     def test_env_secret_fallback(self) -> None:
-        original = os.environ.get("TRIPWIRE_SECRET_KEY")
-        os.environ["TRIPWIRE_SECRET_KEY"] = "sk_env_default"
+        original = os.environ.get("FOIL_SECRET_KEY")
+        os.environ["FOIL_SECRET_KEY"] = "sk_env_default"
         fixture = load_fixture("api/sessions/list.json")
 
         transport = httpx.MockTransport(lambda _request: json_response(fixture))
         try:
-            client = Tripwire(transport=transport)
+            client = Foil(transport=transport)
             result = client.sessions.list()
             self.assertEqual(len(result.items), 1)
         finally:
             client.close()
             if original is None:
-                os.environ.pop("TRIPWIRE_SECRET_KEY", None)
+                os.environ.pop("FOIL_SECRET_KEY", None)
             else:
-                os.environ["TRIPWIRE_SECRET_KEY"] = original
+                os.environ["FOIL_SECRET_KEY"] = original
 
     def test_missing_secret_raises(self) -> None:
-        original = os.environ.pop("TRIPWIRE_SECRET_KEY", None)
+        original = os.environ.pop("FOIL_SECRET_KEY", None)
         try:
-            client = Tripwire()
+            client = Foil()
             self.assertIsNotNone(client.gate)
             client.close()
         finally:
             if original is not None:
-                os.environ["TRIPWIRE_SECRET_KEY"] = original
+                os.environ["FOIL_SECRET_KEY"] = original
 
     def test_secret_endpoints_raise_at_request_time_when_no_secret_is_configured(self) -> None:
-        original = os.environ.pop("TRIPWIRE_SECRET_KEY", None)
+        original = os.environ.pop("FOIL_SECRET_KEY", None)
         try:
-            client = Tripwire(transport=httpx.MockTransport(lambda _request: json_response({})))
-            with self.assertRaises(TripwireConfigurationError):
+            client = Foil(transport=httpx.MockTransport(lambda _request: json_response({})))
+            with self.assertRaises(FoilConfigurationError):
                 client.sessions.list()
             client.close()
         finally:
             if original is not None:
-                os.environ["TRIPWIRE_SECRET_KEY"] = original
+                os.environ["FOIL_SECRET_KEY"] = original
 
     def test_base_url_timeout_and_headers_are_applied(self) -> None:
         fixture = load_fixture("api/sessions/list.json")
 
         def handler(request: httpx.Request) -> httpx.Response:
-            self.assertEqual(str(request.url), "https://example.tripwire.dev/v1/sessions?limit=5")
+            self.assertEqual(str(request.url), "https://example.foil.dev/v1/sessions?limit=5")
             self.assertEqual(request.headers["Authorization"], "Bearer sk_live_test")
-            self.assertEqual(request.headers["X-Tripwire-Client"], "tripwire-server-python/0.1.0")
-            self.assertEqual(request.headers["User-Agent"], "custom-tripwire-client")
+            self.assertEqual(request.headers["X-Foil-Client"], "foil-server-python/0.1.0")
+            self.assertEqual(request.headers["User-Agent"], "custom-foil-client")
             return json_response(fixture)
 
-        client = Tripwire(
+        client = Foil(
             secret_key="sk_live_test",
-            base_url="https://example.tripwire.dev",
+            base_url="https://example.foil.dev",
             timeout=5.0,
-            user_agent="custom-tripwire-client",
+            user_agent="custom-foil-client",
             transport=httpx.MockTransport(handler),
         )
         try:
@@ -112,7 +112,7 @@ class ClientTests(unittest.TestCase):
             cursor = request.url.params.get("cursor")
             return json_response(second_page if cursor else first_page)
 
-        client = Tripwire(secret_key="sk_live_test", transport=httpx.MockTransport(handler))
+        client = Foil(secret_key="sk_live_test", transport=httpx.MockTransport(handler))
         try:
             page = client.sessions.list(verdict="bot", limit=25)
             self.assertEqual(page.limit, 50)
@@ -138,7 +138,7 @@ class ClientTests(unittest.TestCase):
                 return json_response(fp_detail_fixture)
             return json_response(fp_list_fixture)
 
-        client = Tripwire(secret_key="sk_live_test", transport=httpx.MockTransport(handler))
+        client = Foil(secret_key="sk_live_test", transport=httpx.MockTransport(handler))
         try:
             session = client.sessions.get("sid_0123456789abcdefghjkmnpqrs")
             self.assertEqual(session.id, "sid_0123456789abcdefghjkmnpqrs")
@@ -185,7 +185,7 @@ class ClientTests(unittest.TestCase):
                 return json_response(key_list_fixture)
             raise AssertionError(f"Unexpected request: {method} {path}")
 
-        client = Tripwire(secret_key="sk_live_test", transport=httpx.MockTransport(handler))
+        client = Foil(secret_key="sk_live_test", transport=httpx.MockTransport(handler))
         try:
             self.assertEqual(client.organizations.get("org_56789abcdefghjkmnpqrstvwxy").id, "org_56789abcdefghjkmnpqrstvwxy")
             self.assertEqual(
@@ -264,7 +264,7 @@ class ClientTests(unittest.TestCase):
                 return json_response(detail_response)
             raise AssertionError(f"Unexpected request: {request.method} {request.url.path}")
 
-        client = Tripwire(secret_key="sk_live_test", transport=httpx.MockTransport(handler))
+        client = Foil(secret_key="sk_live_test", transport=httpx.MockTransport(handler))
         try:
             page = client.webhooks.list_events(
                 "org_56789abcdefghjkmnpqrstvwxy",
@@ -303,13 +303,13 @@ class ClientTests(unittest.TestCase):
             if path == "/v1/gate/registry":
                 self.assertIsNone(auth)
                 return json_response(registry_list_fixture)
-            if path == "/v1/gate/registry/tripwire":
+            if path == "/v1/gate/registry/foil":
                 self.assertIsNone(auth)
                 return json_response(registry_detail_fixture)
             if path == "/v1/gate/services" and request.method == "GET":
                 self.assertEqual(auth, "Bearer sk_live_test")
                 return json_response(services_list_fixture)
-            if path == "/v1/gate/services/tripwire" and request.method == "GET":
+            if path == "/v1/gate/services/foil" and request.method == "GET":
                 self.assertEqual(auth, "Bearer sk_live_test")
                 return json_response(service_detail_fixture)
             if path == "/v1/gate/services" and request.method == "POST":
@@ -344,12 +344,12 @@ class ClientTests(unittest.TestCase):
                 return httpx.Response(status_code=204)
             raise AssertionError(f"Unexpected request: {request.method} {path}")
 
-        client = Tripwire(secret_key="sk_live_test", transport=httpx.MockTransport(handler))
+        client = Foil(secret_key="sk_live_test", transport=httpx.MockTransport(handler))
         try:
-            self.assertEqual(client.gate.registry.list()[0].id, "tripwire")
-            self.assertEqual(client.gate.registry.get("tripwire").id, "tripwire")
+            self.assertEqual(client.gate.registry.list()[0].id, "foil")
+            self.assertEqual(client.gate.registry.get("foil").id, "foil")
             self.assertEqual(client.gate.services.list()[0].id, "acme_prod")
-            self.assertEqual(client.gate.services.get("tripwire").id, "acme_prod")
+            self.assertEqual(client.gate.services.get("foil").id, "acme_prod")
             self.assertEqual(
                 client.gate.services.create(
                     id="acme_prod",
@@ -364,7 +364,7 @@ class ClientTests(unittest.TestCase):
             self.assertEqual(client.gate.services.disable("acme_prod").status, "disabled")
             self.assertEqual(
                 client.gate.sessions.create(
-                    service_id="tripwire",
+                    service_id="foil",
                     account_name="my-project",
                     delivery={
                         "version": 1,
@@ -392,7 +392,7 @@ class ClientTests(unittest.TestCase):
             )
             self.assertEqual(
                 client.gate.login_sessions.create(
-                    service_id="tripwire",
+                    service_id="foil",
                     agent_token="agt_0123456789abcdefghjkmnpqrs",
                 ).object,
                 "gate_login_session",
@@ -423,7 +423,7 @@ class ClientTests(unittest.TestCase):
     ) -> None:
         error = fixture["error"]
         assert isinstance(error, dict)
-        client = Tripwire(
+        client = Foil(
             secret_key="sk_live_test",
             transport=httpx.MockTransport(
                 lambda _request: json_response(
@@ -434,7 +434,7 @@ class ClientTests(unittest.TestCase):
             ),
         )
         try:
-            with self.assertRaises(TripwireApiError) as exc:
+            with self.assertRaises(FoilApiError) as exc:
                 client.sessions.list(limit=999)
             self.assertEqual(exc.exception.code, error["code"])
             self.assertEqual(exc.exception.request_id, error["request_id"])

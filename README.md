@@ -1,14 +1,14 @@
-# Tripwire Python Library
+# Foil Python Library
 
 ![Preview](https://img.shields.io/badge/status-preview-111827)
 ![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-3776AB?logo=python&logoColor=white)
 ![License: MIT](https://img.shields.io/badge/license-MIT-0f766e.svg)
 
-The Tripwire Python library provides convenient access to the Tripwire API from applications written in Python. It includes a synchronous client for Sessions, Fingerprints, Organizations, Organization API key management, sealed token verification, Gate, and Gate delivery/webhook helpers.
+The Foil Python library provides convenient access to the Foil API from applications written in Python. It includes a synchronous client for Sessions, Fingerprints, Organizations, Organization API key management, sealed token verification, Gate, and Gate delivery/webhook helpers.
 
 The library also provides:
 
-- a fast configuration path using `TRIPWIRE_SECRET_KEY`
+- a fast configuration path using `FOIL_SECRET_KEY`
 - iterator helpers for cursor-based pagination
 - structured API errors and built-in sealed token verification
 - webhook endpoint management, test sends, and event delivery history
@@ -17,14 +17,14 @@ The library also provides:
 
 ## Documentation
 
-See the [Tripwire docs](https://tripwirejs.com/docs) and [API reference](https://tripwirejs.com/docs/api-reference/introduction).
+See the [Foil docs](https://usefoil.com/docs) and [API reference](https://usefoil.com/docs/api-reference/introduction).
 
 ## Installation
 
 You don't need this source code unless you want to modify the package. If you just want to use the package, run:
 
 ```bash
-pip install tripwire-server
+pip install foil-server
 ```
 
 ## Requirements
@@ -33,12 +33,12 @@ pip install tripwire-server
 
 ## Usage
 
-Use `TRIPWIRE_SECRET_KEY` or `secret_key=...` for core detect APIs. For public or bearer-auth Gate flows, the client can also be created without a secret key:
+Use `FOIL_SECRET_KEY` or `secret_key=...` for core detect APIs. For public or bearer-auth Gate flows, the client can also be created without a secret key:
 
 ```python
-from tripwire_server import Tripwire
+from foil_server import Foil
 
-client = Tripwire(secret_key="sk_live_...")
+client = Foil(secret_key="sk_live_...")
 
 page = client.sessions.list(verdict="bot", limit=25)
 session = client.sessions.get("sid_123")
@@ -47,9 +47,9 @@ session = client.sessions.get("sid_123")
 ### Sealed token verification
 
 ```python
-from tripwire_server import safe_verify_tripwire_token
+from foil_server import safe_verify_foil_token
 
-result = safe_verify_tripwire_token(
+result = safe_verify_foil_token(
     sealed_token,
     "sk_live_...",
 )
@@ -100,7 +100,7 @@ client.organizations.api_keys.revoke("org_123", created.id)
 endpoint = client.webhooks.create_endpoint(
     "org_123",
     name="Production alerts",
-    url="https://example.com/tripwire/webhook",
+    url="https://example.com/foil/webhook",
     event_types=["session.result.persisted", "gate.session.approved"],
 )
 
@@ -116,12 +116,12 @@ print(events.items[0].webhook_deliveries[0].status)
 ### Gate APIs
 
 ```python
-from tripwire_server import Tripwire, create_delivery_key_pair
+from foil_server import Foil, create_delivery_key_pair
 
-client = Tripwire()
+client = Foil()
 services = client.gate.registry.list()
 session = client.gate.sessions.create(
-    service_id="tripwire",
+    service_id="foil",
     account_name="my-project",
     delivery=create_delivery_key_pair().delivery,
 )
@@ -132,7 +132,7 @@ print(services[0].id, session.consent_url)
 ### Gate delivery and webhook helpers
 
 ```python
-from tripwire_server import (
+from foil_server import (
     create_delivery_key_pair,
     create_gate_approved_webhook_response,
     decrypt_gate_delivery_envelope,
@@ -145,13 +145,13 @@ response = create_gate_approved_webhook_response(
     {
         "delivery": key_pair.delivery,
         "outputs": {
-            "TRIPWIRE_PUBLISHABLE_KEY": "pk_live_...",
-            "TRIPWIRE_SECRET_KEY": "sk_live_...",
+            "FOIL_PUBLISHABLE_KEY": "pk_live_...",
+            "FOIL_SECRET_KEY": "sk_live_...",
         },
     }
 )
 payload = decrypt_gate_delivery_envelope(key_pair.private_key, response.encrypted_delivery)
-print(payload.outputs["TRIPWIRE_SECRET_KEY"])
+print(payload.outputs["FOIL_SECRET_KEY"])
 raw_body = '{"id":"wevt_123","object":"webhook_event","type":"webhook.test","created":"2026-04-26T00:00:00.000Z","data":{}}'
 print(
     verify_gate_webhook_signature(
@@ -168,14 +168,14 @@ print(event.type)
 ### Error handling
 
 ```python
-from tripwire_server import TripwireApiError
+from foil_server import FoilApiError
 
 try:
     client.sessions.list(limit=999)
-except TripwireApiError as error:
+except FoilApiError as error:
     print(error.status, error.code, error.message)
 ```
 
 ## Support
 
-If you need help integrating Tripwire, start with [tripwirejs.com/docs](https://tripwirejs.com/docs).
+If you need help integrating Foil, start with [usefoil.com/docs](https://usefoil.com/docs).

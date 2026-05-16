@@ -1,8 +1,8 @@
-from .client import Tripwire
+from .client import Foil
 from .errors import (
-    TripwireApiError,
-    TripwireConfigurationError,
-    TripwireTokenVerificationError,
+    FoilApiError,
+    FoilConfigurationError,
+    FoilTokenVerificationError,
 )
 from .gate_delivery import (
     GATE_AGENT_TOKEN_ENV_SUFFIX,
@@ -26,14 +26,14 @@ from .gate_delivery import (
     verify_and_parse_webhook_event,
     verify_gate_webhook_signature,
 )
-from .sealed_token import safe_verify_tripwire_token, verify_tripwire_token
+from .sealed_token import safe_verify_foil_token, verify_foil_token
 from .types import (
     ApiKey,
     AgentTokenVerification,
     Event,
     EventSubject,
     GateApprovedWebhookPayload,
-    GateApprovedWebhookTripwire,
+    GateApprovedWebhookFoil,
     GateDashboardLogin,
     GateLoginSession,
     GateDeliveryEnvelope,
@@ -56,7 +56,7 @@ from .types import (
     SessionDetail,
     SessionSummary,
     VerificationResult,
-    VerifiedTripwireToken,
+    VerifiedFoilToken,
     VisitorFingerprintDetail,
     VisitorFingerprintSummary,
     WebhookDelivery,
@@ -75,7 +75,7 @@ __all__ = [
     "GATE_DELIVERY_VERSION",
     "GateDashboardLogin",
     "GateApprovedWebhookPayload",
-    "GateApprovedWebhookTripwire",
+    "GateApprovedWebhookFoil",
     "GateDeliveryEnvelope",
     "GateDeliveryPayload",
     "GateDeliveryRequest",
@@ -96,12 +96,12 @@ __all__ = [
     "Organization",
     "SessionDetail",
     "SessionSummary",
-    "Tripwire",
-    "TripwireApiError",
-    "TripwireConfigurationError",
-    "TripwireTokenVerificationError",
+    "Foil",
+    "FoilApiError",
+    "FoilConfigurationError",
+    "FoilTokenVerificationError",
     "VerificationResult",
-    "VerifiedTripwireToken",
+    "VerifiedFoilToken",
     "VisitorFingerprintDetail",
     "VisitorFingerprintSummary",
     "WebhookDelivery",
@@ -125,6 +125,6 @@ __all__ = [
     "validate_gate_delivery_request",
     "verify_and_parse_webhook_event",
     "verify_gate_webhook_signature",
-    "verify_tripwire_token",
-    "safe_verify_tripwire_token",
+    "verify_foil_token",
+    "safe_verify_foil_token",
 ]

@@ -15,7 +15,7 @@ from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 
 from .types import (
     GateApprovedWebhookPayload,
-    GateApprovedWebhookTripwire,
+    GateApprovedWebhookFoil,
     GateDeliveryEnvelope,
     GateDeliveryPayload,
     GateDeliveryRequest,
@@ -57,7 +57,7 @@ BLOCKED_GATE_ENV_VAR_KEYS = {
     "XDG_CONFIG_HOME",
 }
 BLOCKED_GATE_ENV_VAR_PREFIXES = ("NPM_CONFIG_", "BUN_CONFIG_", "GIT_CONFIG_")
-GATE_DELIVERY_HKDF_INFO = b"tripwire-gate-delivery:v1"
+GATE_DELIVERY_HKDF_INFO = b"foil-gate-delivery:v1"
 WEBHOOK_EVENT_TYPES = {
     "session.fingerprint.calculated",
     "session.result.persisted",
@@ -69,12 +69,14 @@ WEBHOOK_EVENT_TYPES = {
 def derive_gate_agent_token_env_key(service_id: str) -> str:
     normalized = "_".join(filter(None, "".join(ch if ch.isalnum() else "_" for ch in service_id.strip()).split("_"))).upper()
     if not normalized:
-      raise ValueError("service_id is required to derive a Gate agent token env key")
+        raise ValueError("service_id is required to derive a Gate agent token env key")
+    if normalized in {"FOIL", "FOIL"}:
+        return f"FOIL{GATE_AGENT_TOKEN_ENV_SUFFIX}"
     return f"{normalized}{GATE_AGENT_TOKEN_ENV_SUFFIX}"
 
 
 def is_gate_managed_env_var_key(key: str) -> bool:
-    return key == "TRIPWIRE_AGENT_TOKEN" or key.endswith(GATE_AGENT_TOKEN_ENV_SUFFIX)
+    return key == "FOIL_AGENT_TOKEN" or key.endswith(GATE_AGENT_TOKEN_ENV_SUFFIX)
 
 
 def is_blocked_gate_env_var_key(key: str) -> bool:
@@ -258,17 +260,17 @@ def validate_gate_approved_webhook_payload(value: GateApprovedWebhookPayload | d
         raise ValueError("gate_account_id is required")
     if not payload.account_name:
         raise ValueError("account_name is required")
-    if payload.tripwire.verdict not in {"bot", "human", "inconclusive"}:
-        raise ValueError("tripwire.verdict is invalid")
+    if payload.foil.verdict not in {"bot", "human", "inconclusive"}:
+        raise ValueError("foil.verdict is invalid")
     return GateApprovedWebhookPayload(
         service_id=payload.service_id,
         gate_session_id=payload.gate_session_id,
         gate_account_id=payload.gate_account_id,
         account_name=payload.account_name,
         metadata=dict(payload.metadata) if payload.metadata is not None else None,
-        tripwire=GateApprovedWebhookTripwire(
-            verdict=payload.tripwire.verdict,
-            score=payload.tripwire.score,
+        foil=GateApprovedWebhookFoil(
+            verdict=payload.foil.verdict,
+            score=payload.foil.score,
         ),
         delivery=validate_gate_delivery_request(payload.delivery),
     )
@@ -347,7 +349,7 @@ def verify_and_parse_webhook_event(
         max_age_seconds=max_age_seconds,
         now_seconds=now_seconds,
     ):
-        raise ValueError("Invalid Tripwire webhook signature")
+        raise ValueError("Invalid Foil webhook signature")
     return parse_webhook_event(raw_body)
 
 
@@ -400,9 +402,9 @@ def _coerce_gate_approved_webhook_payload(value: GateApprovedWebhookPayload | di
         return value
     if "event" in value:
         raise ValueError("webhook payload must not include event; use the webhook event envelope type")
-    tripwire = value.get("tripwire")
-    if not isinstance(tripwire, dict):
-        raise ValueError("tripwire must be an object")
+    foil = value.get("foil")
+    if not isinstance(foil, dict):
+        raise ValueError("foil must be an object")
     metadata = value.get("metadata")
     if metadata is not None and not isinstance(metadata, dict):
         raise ValueError("metadata must be an object or null")
@@ -412,9 +414,9 @@ def _coerce_gate_approved_webhook_payload(value: GateApprovedWebhookPayload | di
         gate_account_id=str(value.get("gate_account_id", "")),
         account_name=str(value.get("account_name", "")),
         metadata=dict(metadata) if isinstance(metadata, dict) else None,
-        tripwire=GateApprovedWebhookTripwire(
-            verdict=str(tripwire.get("verdict", "")),
-            score=float(tripwire["score"]) if isinstance(tripwire.get("score"), (float, int)) else None,
+        foil=GateApprovedWebhookFoil(
+            verdict=str(foil.get("verdict", "")),
+            score=float(foil["score"]) if isinstance(foil.get("score"), (float, int)) else None,
         ),
         delivery=_coerce_gate_delivery_request(value.get("delivery", {})),
     )

@@ -4,7 +4,7 @@ import json
 import unittest
 from pathlib import Path
 
-from tripwire_server import (
+from foil_server import (
     create_delivery_key_pair,
     create_gate_approved_webhook_response,
     decrypt_gate_delivery_envelope,
@@ -110,8 +110,8 @@ class GateDeliveryTests(unittest.TestCase):
             {
                 "delivery": key_pair.delivery,
                 "outputs": {
-                    "TRIPWIRE_PUBLISHABLE_KEY": "pk_live_bundle",
-                    "TRIPWIRE_SECRET_KEY": "sk_live_bundle",
+                    "FOIL_PUBLISHABLE_KEY": "pk_live_bundle",
+                    "FOIL_SECRET_KEY": "sk_live_bundle",
                 },
             }
         )
@@ -119,8 +119,8 @@ class GateDeliveryTests(unittest.TestCase):
         self.assertEqual(
             decrypted.outputs,
             {
-                "TRIPWIRE_PUBLISHABLE_KEY": "pk_live_bundle",
-                "TRIPWIRE_SECRET_KEY": "sk_live_bundle",
+                "FOIL_PUBLISHABLE_KEY": "pk_live_bundle",
+                "FOIL_SECRET_KEY": "sk_live_bundle",
             },
         )
 
